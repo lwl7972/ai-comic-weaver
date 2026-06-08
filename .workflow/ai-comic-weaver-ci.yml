@@ -10,8 +10,7 @@ triggers:
 variables:
   PROJECT_NAME: ai-comic-weaver
   VERSION: 0.1.0
-  NODE_VERSION: '20'
-  JAVA_VERSION: '17'
+  ACCESS_TOKEN: 292a18e3bdd03e83f231d5e6129fcc5
 stages:
   - name: build-frontend
     displayName: 构建前端
@@ -122,3 +121,5 @@ stages:
         notify: []
         strategy:
           retry: '0'
+strategy:
+  blocking: true
