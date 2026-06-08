@@ -93,7 +93,10 @@ stages:
           - export ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/
           - export ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/
           - ''
-          - '# 安装根目录依赖（包含 electron + electron-builder，不用全局安装避免 ESM 冲突）'
+          - '# ★ 卸载全局 electron-builder（Gitee Go 环境预装了旧版，会与 ESM 模块冲突）'
+          - npm uninstall -g electron-builder 2>/dev/null || true
+          - ''
+          - '# 安装根目录依赖（electron + electron-builder 本地安装）'
           - npm install --legacy-peer-deps
           - ''
           - '# 确保产物目录存在'
@@ -102,8 +105,8 @@ stages:
           - '# 前端构建'
           - cd frontend && npm install --legacy-peer-deps && npm run build && cd ..
           - ''
-          - '# Electron 打包 Windows（使用本地 electron-builder，非全局安装）'
-          - npx electron-builder --win --publish never
+          - '# Electron 打包 Windows（直接调用本地二进制，绕过 npx 全局版本解析问题）'
+          - ./node_modules/.bin/electron-builder --win --publish never
               --config.productName="AI漫剧"
               --config.appId="com.aicomic.platform"
               --config.directories.output="release/win"
