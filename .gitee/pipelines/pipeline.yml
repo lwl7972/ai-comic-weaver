@@ -93,16 +93,16 @@ stages:
           - export ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/
           - export ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/
           - ''
-          - '# 安装 electron-builder'
-          - npm install -g electron-builder@latest
+          - '# 安装根目录依赖（包含 electron + electron-builder，不用全局安装避免 ESM 冲突）'
+          - npm install --legacy-peer-deps
           - ''
           - '# 确保产物目录存在'
           - mkdir -p frontend/dist backend/target release/win
           - ''
-          - '# 前端构建 (用 npm install 替代 npm ci)'
+          - '# 前端构建'
           - cd frontend && npm install --legacy-peer-deps && npm run build && cd ..
           - ''
-          - '# Electron 打包 Windows'
+          - '# Electron 打包 Windows（使用本地 electron-builder，非全局安装）'
           - npx electron-builder --win --publish never
               --config.productName="AI漫剧"
               --config.appId="com.aicomic.platform"
