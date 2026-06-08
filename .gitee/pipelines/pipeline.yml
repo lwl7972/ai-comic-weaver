@@ -5,7 +5,7 @@
 # 【使用前必读】
 #   1. 在 Gitee 仓库 → 服务 → Gitee Go → 开启流水线
 #   2. 在 变量管理 中添加:
-#      - GITEE_TOKEN: 292a18e3bdd03e83f231d5e6129fcc5
+#      - ACCESS_TOKEN: 292a18e3bdd03e83f231d5e6129fcc5
 # ============================================================
 
 name: ai-comic-weaver-ci
