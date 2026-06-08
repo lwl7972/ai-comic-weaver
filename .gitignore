@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+target/
+
+# Build output
+dist/
+out/
+build/
+*.local
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+.classpath
+.project
+.settings/
+
+# OS
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.bak
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Database
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Generated media (large, should not be committed)
+uploads/
+generated/
+temp/
+cache/
+
+# JVM
+hs_err_pid*
