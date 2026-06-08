@@ -17,13 +17,13 @@ const http: AxiosInstance = axios.create({
 })
 
 // Request interceptor: attach backend port in Electron mode
-http.interceptors.request.use((config) => {
+http.interceptors.request.use(async (config) => {
   // In Electron, redirect API calls to the dynamic JVM port
   if ((window as any).electronAPI?.getBackendPort) {
     const port = await (window as any).electronAPI.getBackendPort()
     config.baseURL = `http://localhost:${port}/api`
   }
-  return config Promise.resolve(config)
+  return config
 }, (error) => {
   return Promise.reject(error)
 })
