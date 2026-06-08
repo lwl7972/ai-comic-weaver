@@ -1,15 +1,9 @@
 # ============================================================
 # AI漫剧制作平台 - Gitee Go 自动化流水线
 # 触发: 推送到 main 分支
-#
-# 【使用前必读】
-#   1. 在 Gitee 仓库 → 服务 → Gitee Go → 开启流水线
-#   2. 在 变量管理 中添加:
-#      - ACCESS_TOKEN: 292a18e3bdd03e83f231d5e6129fcc5
 # ============================================================
 
 name: ai-comic-weaver-ci
-
 displayName: 'AI漫剧 - 自动构建打包'
 
 triggers:
@@ -19,12 +13,14 @@ triggers:
         - main
 
 variables:
-  PROJECT_NAME: "ai-comic-weaver"
-  VERSION: "0.1.0"
-  NODE_VERSION: "20"
-  JAVA_VERSION: "17"
+  VERSION: '0.1.0'
+  NODE_VERSION: '20'
+  JAVA_VERSION: '17'
 
 stages:
+  # ============================================================
+  # Stage 1: 构建前端 (Node.js)
+  # ============================================================
   - name: build-frontend
     displayName: '构建前端'
     strategy: naturally
@@ -35,14 +31,20 @@ stages:
         displayName: 'Vue3 + Vite 构建'
         nodeVersion: ${NODE_VERSION}
         commands:
-          # 使用淘宝镜像加速
+          # 设置淘宝镜像
           - npm config set registry https://registry.npmmirror.com
-          - cd frontend && npm ci && npm run build
+          # 进入 frontend 目录安装依赖并构建
+          - cd frontend && npm ci && npm run build && cd ..
           - echo "✅ 前端构建完成"
+          - ls -la frontend/dist/ || echo "⚠️ dist 目录为空"
         artifacts:
           - name: frontend-dist
             path:
               - frontend/dist/
+
+  # ============================================================
+  # Stage 2: 构建后端 (Maven + JDK)
+  # ============================================================
   - name: build-backend
     displayName: '构建后端'
     strategy: naturally
@@ -54,12 +56,17 @@ stages:
         jdkVersion: ${JAVA_VERSION}
         mavenVersion: 3.9
         commands:
-          - cd backend && mvn clean package -DskipTests -q
-          - echo "✅ 后端JAR构建完成"
+          - cd backend && mvn clean package -DskipTests -q && cd ..
+          - echo "✅ 后端构建完成"
+          - ls -la backend/target/*.jar || echo "⚠️ JAR 文件不存在"
         artifacts:
           - name: backend-jar
             path:
               - backend/target/*.jar
+
+  # ============================================================
+  # Stage 3: Electron 打包 Windows
+  # ============================================================
   - name: package-electron
     displayName: '打包 Electron'
     strategy: naturally
@@ -70,13 +77,25 @@ stages:
         displayName: '打包 Windows 安装包'
         nodeVersion: ${NODE_VERSION}
         commands:
-          # 设置 Electron 镜像（国内加速）
+          # 设置镜像加速（国内必须）
           - export ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/
-          - npm install -g electron-builder@latest
-          # 前端重新构建
+          - export ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/
           - export npm_config_registry=https://registry.npmmirror.com
+
+          # 安装 electron-builder
+          - npm install -g electron-builder@latest
+
+          # 先确保前端和后端产物存在
+          - mkdir -p frontend/dist backend/target release/win
+
+          # 前端构建（使用根目录的 package.json 脚本）
           - cd frontend && npm ci && npm run build && cd ..
-          # 打包 Windows 版本
+
+          # 检查产物
+          - echo "=== 前端产物 ===" && find frontend/dist -type f | head -10 || true
+          - echo "=== 后端产物 ===" && ls backend/target/*.jar 2>/dev/null || echo "无JAR"
+
+          # Electron 打包 Windows
           - npx electron-builder --win --publish never
               --config.productName="AI漫剧"
               --config.appId="com.aicomic.platform"
@@ -86,28 +105,10 @@ stages:
               --config.nsis.oneClick=false
               --config.nsis.allowToChangeInstallationDirectory=true
               --config.nsis.createDesktopShortcut=true
-          - echo "📦 Windows 打包完成"
-          - ls -lh release/win/ || echo "无输出"
-        artifacts:
-          - name: windows-installer
-            path:
-              - release/win/*.exe
-              - release/win/*.yml
-              - release/win/*.blockmap
 
-# ============================================================
-# 发布阶段 (手动触发)
-# ============================================================
-  - name: release
-    displayName: '发布 Release'
-    strategy: naturally
-    trigger: manual  # 手动触发，避免每次push都发版
-    steps:
-      - step: publish@1
-        name: publish_release
-        displayName: '创建版本发布'
-        version: '${VERSION}'
-        allowEmptyChanges: false  # 无变更不发版
+          - echo "📦 打包完成"
+          - ls -lh release/win/*.exe 2>/dev/null || echo "⚠️ 未生成 exe"
+          - ls -lh release/win/*.yml 2>/dev/null || true
         artifacts:
           - name: win-exe
             path:
@@ -116,3 +117,21 @@ stages:
             path:
               - release/win/*.yml
               - release/win/*.blockmap
+
+  # ============================================================
+  # Stage 4: 发布 Release (手动触发)
+  # ============================================================
+  - name: release
+    displayName: '发布 Release'
+    strategy: naturally
+    trigger: manual
+    steps:
+      - step: publish@1
+        name: publish_release
+        displayName: '创建版本发布'
+        version: '${VERSION}'
+        allowEmptyChanges: false
+        artifacts:
+          - name: win-installer
+            path:
+              - release/win/*.exe
