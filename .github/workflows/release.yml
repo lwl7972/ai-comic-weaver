@@ -132,8 +132,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-blockmap
-          path: release/win/*.yml
-          path: release/win/*.blockmap
+          path: |
+            release/win/*.yml
+            release/win/*.blockmap
 
   # ================================================================
   # Job 3: 打包 macOS 版本
