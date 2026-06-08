@@ -93,8 +93,11 @@ stages:
           - export ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/
           - export ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/
           - ''
-          - '# ★ 彻底移除Gitee预装的全局electron-builder（从PATH中排除npm-global目录）'
-          - export PATH=$(echo $PATH | sed 's|:/root/.npm-global/bin||g' | sed 's|/root/.npm-global/bin:||g')
+          - '# ★ 核弹级方案：物理删除Gitee预装的全局electron-builder（所有软/硬方式都被劫持了）'
+          - rm -rf /root/.npm-global/lib/node_modules/electron-builder || true
+          - rm -rf /root/.npm-global/lib/node_modules/@noble/hashes || true
+          - which electron-builder && rm $(which electron-builder) || true
+          - hash -r 2>/dev/null || true
           - ''
           - '# 确保产物目录存在'
           - mkdir -p frontend/dist backend/target release/win
@@ -102,11 +105,14 @@ stages:
           - '# 前端构建'
           - cd frontend && npm install --legacy-peer-deps && npm run build && cd ..
           - ''
-          - '# 安装兼容版electron-builder（v24.x纯CJS，无ESM冲突）到本地'
-          - npm install --no-save electron-builder@24.13.0
+          - '# 下载兼容版electron-builder到临时目录（v24.x纯CJS，无ESM冲突）'
+          - mkdir -p /tmp/eb-local && cd /tmp/eb-local
+          - npm init -y --silent 2>/dev/null || true
+          - npm install --no-save electron-builder@24.13.0 2>&1 | tail -3
+          - cd $OLDPWD
           - ''
-          - '# Electron 打包 Windows（用node直接运行本地模块，彻底绕过全局版本）'
-          - node node_modules/electron-builder/cli.js --win --publish never
+          - '# Electron 打包 Windows（用node直接运行独立目录的cli.js）'
+          - node /tmp/eb-local/node_modules/electron-builder/cli.js --win --publish never
               --config.productName="AI漫剧"
               --config.appId="com.aicomic.platform"
               --config.directories.output="release/win"
