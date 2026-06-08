@@ -93,26 +93,25 @@ stages:
           - export ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/
           - export ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/
           - ''
-          - '# ★ 核弹级方案：物理删除Gitee预装的全局electron-builder（所有软/硬方式都被劫持了）'
-          - rm -rf /root/.npm-global/lib/node_modules/electron-builder || true
-          - rm -rf /root/.npm-global/lib/node_modules/@noble/hashes || true
-          - which electron-builder && rm $(which electron-builder) || true
-          - hash -r 2>/dev/null || true
+          - '# ★ Gitee Go 通过 NODE_PATH 强制注入全局模块路径，必须清空它以阻断全局解析'
+          - echo "原始 NODE_PATH=$NODE_PATH"
+          - export NODE_PATH=""
           - ''
           - '# 确保产物目录存在'
           - mkdir -p frontend/dist backend/target release/win
           - ''
-          - '# 前端构建'
-          - cd frontend && npm install --legacy-peer-deps && npm run build && cd ..
+          - '# 前端构建（先恢复 NODE_PATH 避免影响 npm）'
+          - cd frontend && NODE_PATH="" npm install --legacy-peer-deps && npm run build && cd ..
           - ''
-          - '# 下载兼容版electron-builder到临时目录（v24.x纯CJS，无ESM冲突）'
+          - '# Electron打包：用 npm pack 下载 tarball 并解压到独立目录，完全隔离'
           - mkdir -p /tmp/eb-local && cd /tmp/eb-local
-          - npm init -y --silent 2>/dev/null || true
-          - npm install --no-save electron-builder@24.13.0 2>&1 | tail -3
-          - cd $OLDPWD
+          - npm pack electron-builder@24.13.0 --pack-destination . 2>&1 | tail -1
+          - tar xzf electron-builder-*.tgz && cd package
+          - npm install --production --legacy-peer-deps 2>&1 | tail -3
           - ''
-          - '# Electron 打包 Windows（用node直接运行独立目录的cli.js）'
-          - node /tmp/eb-local/node_modules/electron-builder/cli.js --win --publish never
+          - '# ★ 执行打包：NODE_PATH=空 + 从独立目录运行，彻底阻断全局解析'
+          - cd /tmp/eb-local/package && NODE_PATH="" node node_modules/electron-builder/cli.js --win --publish never
+              --projectDir=$OLDPWD
               --config.productName="AI漫剧"
               --config.appId="com.aicomic.platform"
               --config.directories.output="release/win"
@@ -122,6 +121,8 @@ stages:
               --config.nsis.allowToChangeInstallationDirectory=true
               --config.nsis.createDesktopShortcut=true
           - ''
+          - '# 回到项目目录检查产物'
+          - cd $OLDPWD
           - echo "📦 打包完成"
           - ls -lh release/win/*.exe 2>/dev/null || echo "⚠️ exe 未生成"
         artifacts:
