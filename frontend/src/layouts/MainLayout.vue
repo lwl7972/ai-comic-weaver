@@ -3,7 +3,7 @@
     <!-- Header -->
     <el-header class="layout-header" :height="56">
       <div class="header-left">
-        <img src="../../assets/logo.png" alt="AI漫剧" class="header-logo" />
+        <img src="../assets/logo.png" alt="AI漫剧" class="header-logo" />
         <span class="header-title">AI漫剧</span>
       </div>
       <div class="header-center">
