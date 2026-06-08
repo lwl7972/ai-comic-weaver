@@ -1,101 +1,108 @@
-# ============================================================
-# AI漫剧制作平台 - Gitee Go 自动化流水线
-# 触发: 推送到 main 分支
-# ============================================================
-
+version: '1.0'
 name: ai-comic-weaver-ci
-displayName: 'AI漫剧 - 自动构建打包'
-
+displayName: main-pipline
 triggers:
+  trigger: auto
   push:
     branches:
       include:
         - main
-
 variables:
+  PROJECT_NAME: ai-comic-weaver
   VERSION: '0.1.0'
-  NODE_VERSION: '20'
-  JAVA_VERSION: '17'
-
+  # ⚠️ ACCESS_TOKEN 已在变量管理中配置，不要写在YAML里（安全风险）
 stages:
+
   # ============================================================
-  # Stage 1: 构建前端 (Node.js)
+  # Stage 1: 构建前端
   # ============================================================
   - name: build-frontend
-    displayName: '构建前端'
+    displayName: 构建前端
     strategy: naturally
     trigger: auto
+    executor:
+      - sf110
     steps:
-      - step: build@1
-        name: build_frontend
-        displayName: 'Vue3 + Vite 构建'
-        nodeVersion: ${NODE_VERSION}
+      - step: build@nodejs
+        name: build_nodejs
+        displayName: Nodejs 构建
+        nodeVersion: 20.10.0
         commands:
-          # 设置淘宝镜像
+          - '# 设置NPM源'
           - npm config set registry https://registry.npmmirror.com
-          # 进入 frontend 目录安装依赖并构建
-          - cd frontend && npm ci && npm run build && cd ..
+          - ''
+          - '# ★ 关键修复：进入 frontend 子目录构建'
+          - cd frontend && npm ci && npm run build
           - echo "✅ 前端构建完成"
-          - ls -la frontend/dist/ || echo "⚠️ dist 目录为空"
         artifacts:
           - name: frontend-dist
             path:
-              - frontend/dist/
+              - ./frontend/dist/
+        caches:
+          - ~/.npm
+        notify: []
+        strategy:
+          retry: '0'
 
   # ============================================================
-  # Stage 2: 构建后端 (Maven + JDK)
+  # Stage 2: 构建后端
   # ============================================================
   - name: build-backend
-    displayName: '构建后端'
+    displayName: 构建后端
     strategy: naturally
     trigger: auto
+    executor:
+      - sf110
     steps:
-      - step: build@1
-        name: build_backend
-        displayName: 'Spring Boot Maven 构建'
-        jdkVersion: ${JAVA_VERSION}
-        mavenVersion: 3.9
+      - step: build@maven
+        name: build_maven
+        displayName: Maven 构建
+        jdkVersion: '17'
+        mavenVersion: 3.9.11
         commands:
-          - cd backend && mvn clean package -DskipTests -q && cd ..
+          - '# ★ 关键修复：进入 backend 子目录构建'
+          - cd backend && mvn clean package -Dmaven.test.skip=true -B
           - echo "✅ 后端构建完成"
-          - ls -la backend/target/*.jar || echo "⚠️ JAR 文件不存在"
         artifacts:
           - name: backend-jar
             path:
-              - backend/target/*.jar
+              - ./backend/target/*.jar
+        caches:
+          - ~/.m2
+        notify: []
+        strategy:
+          retry: '0'
 
   # ============================================================
-  # Stage 3: Electron 打包 Windows
+  # Stage 3: 打包 Electron Windows
   # ============================================================
   - name: package-electron
-    displayName: '打包 Electron'
+    displayName: 打包 Electron
     strategy: naturally
     trigger: auto
     steps:
-      - step: build@1
-        name: package_win
-        displayName: '打包 Windows 安装包'
-        nodeVersion: ${NODE_VERSION}
+      - step: build@nodejs
+        name: build_electron
+        displayName: Electron 打包
+        nodeVersion: 20.10.0
         commands:
-          # 设置镜像加速（国内必须）
+          - '# 设置NPM源'
+          - npm config set registry https://registry.npmmirror.com
+          - ''
+          - '# ★ 关键：Electron 国内镜像加速（必须）'
           - export ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/
           - export ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/
-          - export npm_config_registry=https://registry.npmmirror.com
-
-          # 安装 electron-builder
+          - ''
+          - '# 安装 electron-builder'
           - npm install -g electron-builder@latest
-
-          # 先确保前端和后端产物存在
+          - ''
+          - '# 确保产物目录存在'
           - mkdir -p frontend/dist backend/target release/win
-
-          # 前端构建（使用根目录的 package.json 脚本）
+          - ''
+          - '# 前端构建'
           - cd frontend && npm ci && npm run build && cd ..
-
-          # 检查产物
-          - echo "=== 前端产物 ===" && find frontend/dist -type f | head -10 || true
-          - echo "=== 后端产物 ===" && ls backend/target/*.jar 2>/dev/null || echo "无JAR"
-
-          # Electron 打包 Windows
+          - ''
+          - '# Electron 打包 Windows'
           - npx electron-builder --win --publish never
               --config.productName="AI漫剧"
               --config.appId="com.aicomic.platform"
@@ -105,33 +112,62 @@ stages:
               --config.nsis.oneClick=false
               --config.nsis.allowToChangeInstallationDirectory=true
               --config.nsis.createDesktopShortcut=true
-
+          - ''
           - echo "📦 打包完成"
-          - ls -lh release/win/*.exe 2>/dev/null || echo "⚠️ 未生成 exe"
-          - ls -lh release/win/*.yml 2>/dev/null || true
+          - ls -lh release/win/*.exe 2>/dev/null || echo "⚠️ exe 未生成"
         artifacts:
           - name: win-exe
             path:
-              - release/win/*.exe
+              - ./release/win/*.exe
           - name: win-update
             path:
-              - release/win/*.yml
-              - release/win/*.blockmap
+              - ./release/win/*.yml
+              - ./release/win/*.blockmap
+        caches:
+          - ~/.npm
+        notify: []
+        strategy:
+          retry: '1'   # Electron 下载可能失败，重试一次
 
   # ============================================================
   # Stage 4: 发布 Release (手动触发)
   # ============================================================
   - name: release
-    displayName: '发布 Release'
+    displayName: 发布 Release
     strategy: naturally
     trigger: manual
     steps:
-      - step: publish@1
-        name: publish_release
-        displayName: '创建版本发布'
-        version: '${VERSION}'
-        allowEmptyChanges: false
-        artifacts:
-          - name: win-installer
-            path:
-              - release/win/*.exe
+      - step: release@gitee
+        name: release_gitee
+        displayName: Gitee Release
+        releaseName: AI漫剧 ${VERSION}
+        description: |
+          ## AI漫剧制作平台 v${VERSION}
+
+          ### ✨ 功能
+          - 六大模块流水线完整骨架
+          - Vue3 + Element Plus 前端界面
+          - Spring Boot 后端 + SQLite
+          - Electron 桌面端
+
+          ### 📥 下载安装包
+
+          | 平台 | 文件 |
+          |------|------|
+          | Windows | AI漫剧-Setup-x64.exe |
+
+          > 首次启动需要等待 JVM 初始化（约 5-10 秒）
+
+          ---
+          *由 Gitee Go 自动构建发布*
+        tagName: v${VERSION}
+        upstreamArtifact:
+          - win-exe       # ★ 修改：引用 Electron 的产物
+        assertFiles: null
+        prerelease: false
+        allowUpdate: true
+        notify: []
+        strategy:
+          retry: '0'
+strategy:
+  blocking: true
