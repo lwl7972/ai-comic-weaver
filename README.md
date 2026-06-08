@@ -1,6 +1,8 @@
-# AI 漫剧制作平台
+# AI 漫剧制作平台 (AI Comic Weaver)
 
 > 基于六大模块流水线（剧本 → 角色 → 场景 → 分镜 → 导演 → S级）的 AI 漫剧创作桌面应用
+
+**仓库地址**: https://gitee.com/aiprojects_1/ai-comic-weaver
 
 ## 技术栈
 
