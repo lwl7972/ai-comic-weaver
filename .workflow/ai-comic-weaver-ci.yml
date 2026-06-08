@@ -31,8 +31,8 @@ stages:
           - '# 设置NPM源'
           - npm config set registry https://registry.npmmirror.com
           - ''
-          - '# ★ 关键修复：进入 frontend 子目录构建'
-          - cd frontend && npm ci && npm run build
+          - '# ★ 关键修复：进入 frontend 子目录构建 (用 npm install 替代 npm ci，因为无 lock 文件)'
+          - cd frontend && npm install --legacy-peer-deps && npm run build
           - echo "✅ 前端构建完成"
         artifacts:
           - name: frontend-dist
@@ -99,8 +99,8 @@ stages:
           - '# 确保产物目录存在'
           - mkdir -p frontend/dist backend/target release/win
           - ''
-          - '# 前端构建'
-          - cd frontend && npm ci && npm run build && cd ..
+          - '# 前端构建 (用 npm install 替代 npm ci)'
+          - cd frontend && npm install --legacy-peer-deps && npm run build && cd ..
           - ''
           - '# Electron 打包 Windows'
           - npx electron-builder --win --publish never
