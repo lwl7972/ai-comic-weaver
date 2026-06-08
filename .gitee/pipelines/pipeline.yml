@@ -93,15 +93,20 @@ stages:
           - export ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/
           - export ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/
           - ''
+          - '# ★ 彻底移除Gitee预装的全局electron-builder（从PATH中排除npm-global目录）'
+          - export PATH=$(echo $PATH | sed 's|:/root/.npm-global/bin||g' | sed 's|/root/.npm-global/bin:||g')
+          - ''
           - '# 确保产物目录存在'
           - mkdir -p frontend/dist backend/target release/win
           - ''
           - '# 前端构建'
           - cd frontend && npm install --legacy-peer-deps && npm run build && cd ..
           - ''
-          - '# Electron 打包 Windows'
-          - '# ★ 使用 --yes 强制下载 v24.13.0（最后纯CJS版，无ESM冲突），彻底绕过Gitee全局旧版'
-          - npx --yes electron-builder@24.13.0 --win --publish never
+          - '# 安装兼容版electron-builder（v24.x纯CJS，无ESM冲突）到本地'
+          - npm install --no-save electron-builder@24.13.0
+          - ''
+          - '# Electron 打包 Windows（用node直接运行本地模块，彻底绕过全局版本）'
+          - node node_modules/electron-builder/cli.js --win --publish never
               --config.productName="AI漫剧"
               --config.appId="com.aicomic.platform"
               --config.directories.output="release/win"
