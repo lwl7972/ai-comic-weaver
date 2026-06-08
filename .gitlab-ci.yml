@@ -1,0 +1,196 @@
+# ============================================================
+# AI漫剧制作平台 - CI/CD 自动化流水线
+# 触发条件: 推送到 main 分支时自动打包 Electron 并发布 Release
+# 平台: GitCode (兼容 GitLab CI)
+# ============================================================
+
+stages:
+  - build-frontend
+  - build-backend
+  - package-electron
+  - release
+
+variables:
+  PROJECT_NAME: "ai-comic-platform"
+  VERSION: "0.1.0"
+  NODE_VERSION: "20"
+  JAVA_VERSION: "17"
+  MAVEN_VERSION: "3.9"
+
+# ============================================================
+# Stage 1: 构建前端 (Vue 3 + Vite)
+# ============================================================
+build-frontend:
+  stage: build-frontend
+  image: node:${NODE_VERSION}-slim
+  only:
+    - main
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}-frontend-deps
+    paths:
+      - frontend/node_modules/
+      - frontend/.vite/
+  script:
+    - cd frontend && npm ci --registry=https://registry.npmmirror.com
+    - npm run build
+    - echo "Frontend build completed: $(ls dist/ | wc -l) files"
+  artifacts:
+    paths:
+      - frontend/dist/
+    expire_in: 2 hours
+
+# ============================================================
+# Stage 2: 构建后端 (Spring Boot + Maven)
+# ============================================================
+build-backend:
+  stage: build-backend
+  image: maven:${MAVEN_VERSION}-eclipse-temurin-${JAVA_VERSION}
+  only:
+    - main
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}-maven-deps
+    paths:
+      - backend/.m2/repository/
+  variables:
+    MAVEN_OPTS: "-Dmaven.repo.local=$CI_PROJECT_DIR/backend/.m2/repository"
+  script:
+    - cd backend && mvn clean package -DskipTests -q
+    - echo "Backend JAR built: $(ls target/*.jar)"
+  artifacts:
+    paths:
+      - backend/target/*.jar
+    expire_in: 2 hours
+
+# ============================================================
+# Stage 3: 打包 Electron 桌面应用
+# ============================================================
+package-electron-win:
+  stage: package-electron
+  image: electronuserland/builder:wine
+  only:
+    - main
+  needs:
+    - job: build-frontend
+      artifacts: true
+    - job: build-backend
+      artifacts: true
+  before_script:
+    # 安装 Node.js 和依赖
+    - export NODE_VERSION=${NODE_VERSION}
+    - curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash -
+    - apt-get install -y nodejs
+    - npm install -g electron-builder@latest
+  script:
+    # 复制后端 JAR 到正确位置
+    - mkdir -p backend/target
+    - cp ../backend/target/ai-comic-platform-*.jar backend/target/
+    
+    # 复制前端构建产物到 electron 引用位置
+    - mkdir -p frontend/dist
+    - cp -r ../frontend/dist/* frontend/dist/ || true
+    
+    # 安装前端依赖并构建（确保 Vite 输出到正确目录）
+    - cd frontend && npm ci --registry=https://registry.npmmirror.com && npm run build && cd ..
+    
+    # 执行 electron-builder 打包 Windows 版本
+    - npx electron-builder --win --publish never \
+        -c.productName="AI漫剧" \
+        -c.appId="com.aicomic.platform" \
+        -c.directories.output=release/win \
+        -c.win.target=nsis \
+        -c.win.icon=assets/logo.png \
+        -c.nsis.oneClick=false \
+        -c.nsis.allowToChangeInstallationDirectory=true \
+        -c.nsis.installerIcon=assets/logo.png
+    
+    - echo "=== Build Artifacts ===" 
+    - ls -lh release/win/*.exe release/win/*.yml 2>/dev/null || ls -lh release/ 2>/dev/null
+  artifacts:
+    paths:
+      - release/win/
+    expire_in: 7 days
+  tags:
+    - docker
+
+package-electron-mac:
+  stage: package-electron
+  image: electronuserland/builder:20
+  only:
+    - main
+    - tags  # 也支持打 tag 时发布 macOS 版本
+  needs:
+    - job: build-frontend
+      artifacts: true
+    - job: build-backend
+      artifacts: true
+  allow_failure: true  # macOS 构建可选，失败不阻塞
+  before_script:
+    - npm install -g electron-builder@latest
+  script:
+    - cp -r ../backend/target/ai-comic-platform-*.jar backend/target/ || true
+    - cd frontend && npm ci --registry=https://registry.npmmirror.com && npm run build && cd ..
+    - npx electron-builder --mac --publish never \
+        -c.directories.output=release/mac \
+        -c.mac.target=dmg \
+        -c.mac.icon=assets/logo.png
+    - ls -lh release/mac/
+  artifacts:
+    paths:
+      - release/mac/
+    expire_in: 7 days
+
+# ============================================================
+# Stage 4: 创建 Release
+# ============================================================
+create-release:
+  stage: release
+  image: alpine:latest
+  only:
+    - main
+  needs:
+    - job: package-electron-win
+      artifacts: true
+    - job: package-electron-mac
+      artifacts: true
+      optional: true
+  before_script:
+    - apk add --no-cache curl jq
+  script:
+    # 获取最新 tag 或使用 commit SHA 作为版本标识
+    - |
+      BUILD_DATE=$(date +%Y%m%d)
+      SHORT_SHA=$(echo $CI_COMMIT_SHA | cut -c1-8)
+      RELEASE_TAG="v${VERSION}-${BUILD_DATE}-${SHORT_SHA}"
+    
+    # 收集所有发布文件
+    - mkdir -p release-artifacts
+    - cp release/win/*.exe release/artifacts/ 2>/dev/null || true
+    - cp release/mac/*.dmg release/artifacts/ 2>/dev/null || true
+    - cp release/win/*.blockmap release/artifacts/ 2>/dev/null || true
+    
+    - |
+      echo "Creating release: ${RELEASE_TAG}"
+      echo "Files:"
+      ls -lh release-artifacts/ 2>/dev/null || echo "(no files found)"
+      
+    # 使用 GitCode API 创建 Release（如果支持）
+    # 注意：GitCode 的 API 可能需要根据实际文档调整
+    - |
+      if [ -n "$GITCODE_TOKEN" ]; then
+        curl -s -X POST "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/releases" \
+          --header "PRIVATE-TOKEN: $GITCODE_TOKEN" \
+          --header "Content-Type: application/json" \
+          -d "{
+            \"name\": \"AI漫剧 ${RELEASE_TAG}\",
+            \"tag_name\": \"${RELEASE_TAG}\",
+            \"description\": \"## AI漫剧制作平台 v${RELEASE_TAG}\\n\\n### 更新内容\\n- 完整项目骨架初始化\\n- 六大模块流水线导航\\n- 28张数据表 Entity\\n- Electron 桌面端打包\\n\\n### 下载\\n请从下方附件下载对应平台的安装包\",
+            \"assets\": { \"links\": [] }
+          }" && echo "Release created successfully" || echo "Release creation failed, continuing..."
+      fi
+  environment:
+    name: production
+    url: https://gitcode.com/aicomic/aicomic/-/releases
+  artifacts:
+    paths:
+      - release-artifacts/
+    expire_in: 30 days
