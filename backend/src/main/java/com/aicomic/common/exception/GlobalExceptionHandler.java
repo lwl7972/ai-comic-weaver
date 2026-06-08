@@ -24,7 +24,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BusinessException.class)
     public ApiResponse<?> handleBusinessException(BusinessException e) {
-        return ApiResponse.error(e.code(), e.message());
+        return ApiResponse.error(e.code(), e.getMessage());
     }
 
     @ExceptionHandler(Exception.class)
