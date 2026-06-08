@@ -11,7 +11,16 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @record BusinessException(int code, String message) extends RuntimeException {}
+    public static class BusinessException extends RuntimeException {
+        private final int code;
+
+        public BusinessException(int code, String message) {
+            super(message);
+            this.code = code;
+        }
+
+        public int code() { return code; }
+    }
 
     @ExceptionHandler(BusinessException.class)
     public ApiResponse<?> handleBusinessException(BusinessException e) {
