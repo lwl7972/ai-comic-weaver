@@ -80,7 +80,7 @@ stages:
           - export ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/
           - export ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/
           - ''
-          - '# ★★★ 禁掉代码签名（CI 环境无证书）★★★'
+          - '# ★★★ 禁掉代码签名 + app-builder 修改 ★★★'
           - export CSC_IDENTITY_AUTO_DISCOVERY=false
           - ''
           - '# 安装项目依赖'
@@ -92,8 +92,22 @@ stages:
           - '# 前端构建'
           - cd frontend && npm install --legacy-peer-deps && npm run build && cd ..
           - ''
-          - '# Electron 打包 Windows（zip，无需 wine）'
-          - npx electron-builder --win --publish never --config.productName="AI漫剧" --config.appId="com.aicomic.platform" --config.directories.output="release/win" --config.win.target="zip" --config.win.icon="assets/logo.png"
+          - '# ★★★ 生成 CI 专用打包配置（绕过 CLI 传参问题）★★★'
+          - cat > electron-builder-ci.json << 'BUILDEOF'
+          - '{'
+          - '  "productName": "AI漫剧",'
+          - '  "appId": "com.aicomic.platform",'
+          - '  "directories": {"output": "release/win"},'
+          - '  "files": ["backend/target/*.jar", "frontend/dist/**/*", "electron/**/*", "assets/**/*"],'
+          - '  "win": {'
+          - '    "target": "zip",'
+          - '    "icon": "assets/logo.png"'
+          - '  }'
+          - '}'
+          - BUILDEOF
+          - ''
+          - '# Electron 打包'
+          - npx electron-builder --win --publish never --config=electron-builder-ci.json
           - ''
           - echo "打包完成"
           - ls -lh release/win/*.zip 2>/dev/null || echo "zip 未生成"
