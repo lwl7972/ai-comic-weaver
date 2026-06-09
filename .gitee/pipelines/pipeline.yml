@@ -98,7 +98,8 @@ stages:
           - '# ====== [1] 构建前端 ======'
           - mkdir -p frontend/dist backend/target release/win && cd frontend && npm install --legacy-peer-deps && npm run build
           - '# ====== [2] 修复 @noble/hashes（在插件接管打包之前执行） ======'
-          - cd .. && bash scripts/fix-noble.sh
+          - cd ..
+          - bash scripts/fix-noble.sh
           - '# ====== [3] 打包（插件会将此行替换为 npx electron-builder） ======'
           - echo "placeholder for auto-packaging"
         artifacts:
