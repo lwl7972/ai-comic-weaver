@@ -9,8 +9,7 @@ triggers:
         - main
 variables:
   PROJECT_NAME: ai-comic-weaver
-  VERSION: '0.1.0'
-  # ⚠️ ACCESS_TOKEN 已在变量管理中配置，不要写在YAML里（安全风险）
+  # VERSION 动态从 package.json 获取，不再硬编码
 stages:
 
   # ============================================================
@@ -28,12 +27,11 @@ stages:
         displayName: Nodejs 构建
         nodeVersion: 20.10.0
         commands:
-          - '# 设置NPM源'
           - npm config set registry https://registry.npmmirror.com
-          - ''
-          - '# ★ 关键修复：进入 frontend 子目录构建 (用 npm install 替代 npm ci，因为无 lock 文件)'
+          - echo ">>> [frontend] 开始构建..."
           - cd frontend && npm install --legacy-peer-deps && npm run build
-          - echo "✅ 前端构建完成"
+          - echo ">>> [frontend] ✅ 构建完成"
+          - ls -la dist/
         artifacts:
           - name: frontend-dist
             path:
@@ -60,9 +58,10 @@ stages:
         jdkVersion: '17'
         mavenVersion: 3.9.11
         commands:
-          - '# ★ 关键修复：进入 backend 子目录构建'
+          - echo ">>> [backend] 开始构建..."
           - cd backend && mvn clean package -Dmaven.test.skip=true -B
-          - echo "✅ 后端构建完成"
+          - echo ">>> [backend] ✅ 构建完成"
+          - ls -la target/*.jar
         artifacts:
           - name: backend-jar
             path:
@@ -80,45 +79,50 @@ stages:
     displayName: 打包 Electron
     strategy: naturally
     trigger: auto
+    # ★ 依赖前两个 stage 完成，artifacts 会自动传入
+    dependOn:
+      - name: build-frontend
+      - name: build-backend
     steps:
-      # ★★★ build@nodejs 插件行为分析 ★★★
+      # ★★★ build@nodejs 插件行为 ★★★
       #   1. 保留第1条用户命令
       #   2. 自动注入: export ELECTRON_MIRROR, ELECTRON_BUILDER_BINARIES_MIRROR
-      #   3. 自动注入: npm install -g electron-builder@latest（含 @noble/hashes@2.x ESM）
+      #   3. 自动注入: npm install -g electron-builder@latest
       #   4. 保留后续用户命令（仅限构建相关）
-      #   5. 从第一个 cd .. 开始，丢弃所有后续用户命令，替换为 npx electron-builder
+      #   5. 从第一个 cd .. 开始，丢弃所有后续命令，替换为 npx electron-builder
       #
-      #   对策: fix-noble.sh 放在第2条命令（插件注入 electron-builder 之后立即执行修补）
-      #         前端构建放在第3条命令
-      #         不在 YAML 中写任何 cd .. 或打包相关命令，让插件自动生成
+      #   ★ 对策：不写任何 cd ..，不写打包命令，让插件自动处理
       - step: build@nodejs
         name: build_electron
         displayName: Electron 打包
         nodeVersion: 20.10.0
         commands:
           - npm config set registry https://registry.npmmirror.com
-          - '# ====== [0] 修补 @noble/hashes（插件安装 electron-builder 后立即执行） ======'
+          - '# ====== [0] 修补 @noble/hashes ======'
           - bash scripts/fix-noble.sh
-          - '# ====== [1] 构建前端（用子shell避免cd问题） ======'
-          - (cd frontend && npm install --legacy-peer-deps && npm run build)
-          - '# ====== [2] 构建后端（用子shell避免cd问题） ======'
-          - (cd backend && mvn clean package -Dmaven.test.skip=true -B -q)
+          - '# ====== [1] 验证 artifacts 是否存在 ======'
+          - echo ">>> [electron] 检查前置产物..."
+          - test -d frontend/dist && echo "✅ frontend/dist 存在" || { echo "❌ frontend/dist 不存在!"; exit 1; }
+          - ls backend/target/*.jar 2>/dev/null && echo "✅ backend jar 存在" || { echo "❌ backend jar 不存在!"; exit 1; }
+          - '# ====== [2] 安装项目依赖 ======'
+          - npm install --legacy-peer-deps
+          - echo ">>> [electron] 准备完成，等待插件执行 electron-builder..."
         artifacts:
           - name: win-exe
             path:
               - ./*.exe
-              - ./release/*.exe
+              - ./release/**/*.exe
           - name: win-update
             path:
               - ./*.yml
               - ./*.blockmap
-              - ./release/*.yml
-              - ./release/*.blockmap
+              - ./release/**/*.yml
+              - ./release/**/*.blockmap
         caches:
           - ~/.npm
         notify: []
         strategy:
-          retry: '1'   # Electron 下载可能失败，重试一次
+          retry: '1'
 
   # ============================================================
   # Stage 4: 发布 Release (手动触发)
@@ -145,7 +149,7 @@ stages:
 
           | 平台 | 文件 |
           |------|------|
-          | Windows | AI漫剧_Setup_0.1.0.exe |
+          | Windows | AI漫剧_Setup_${VERSION}.exe |
 
           > 首次启动需要等待 JVM 初始化（约 5-10 秒）
 
