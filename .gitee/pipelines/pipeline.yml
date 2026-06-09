@@ -157,7 +157,7 @@ stages:
           *由 Gitee Go 自动构建发布*
         tagName: v${VERSION}
         upstreamArtifact:
-          - win_exe
+          - win-exe
         assertFiles: null
         prerelease: false
         allowUpdate: true
