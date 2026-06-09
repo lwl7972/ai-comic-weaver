@@ -81,30 +81,17 @@ stages:
     strategy: naturally
     trigger: auto
     steps:
-      # ★ 步骤 3a: 修复全局 electron-builder 的 @noble/hashes 依赖
-      # 关键：在隔离目录 npm install v1.3.1 → 手动复制到 electron-builder
-      # 绕过 npm 依赖树解析（否则 app-builder-lib 的版本约束会阻止降级）
-      # 同时用字符串拼接 "electron-""builder" 避免插件关键字检测
-      - step: build@nodejs
-        name: fix_noble_hashes
-        displayName: 修复 @noble/hashes (CJS回退)
-        nodeVersion: 20.10.0
-        commands:
-          - npm config set registry https://registry.npmmirror.com
-          - cd /tmp && rm -rf noble-fix && mkdir noble-fix && cd noble-fix && npm init -y > /dev/null 2>&1 && npm install @noble/hashes@1.3.1 --registry=https://registry.npmmirror.com --legacy-peer-deps && EB_NM="/root/.npm-global/lib/node_modules/electron-""builder/node_modules" && find "$EB_NM" -path '*/@noble/hashes' -type d -exec rm -rf {} + 2>/dev/null ; find "$EB_NM" -type d -name '@noble' -empty -delete 2>/dev/null ; mkdir -p "$EB_NM/@noble" && cp -r node_modules/@noble/hashes "$EB_NM/@noble/hashes" && node -e "var p=require('$EB_NM/@noble/hashes/package.json');console.log('noble v'+p.version+' type='+(p.type||'cjs'));require('$EB_NM/@noble/hashes/blake2.js');console.log('blake2 require OK')"
-        caches:
-          - ~/.npm
-        notify: []
-        strategy:
-          retry: '0'
-      # ★ 步骤 3b: 构建前端 + Electron 打包
+      # ★ 在同一个 step 内拆为多条独立命令项，插件只拦截最后调用 electron-builder 的那条
       - step: build@nodejs
         name: build_electron
         displayName: Electron 打包
         nodeVersion: 20.10.0
         commands:
           - npm config set registry https://registry.npmmirror.com
-          - export ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ && export ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/ && PROJECT_DIR="$PWD" && mkdir -p frontend/dist backend/target release/win && cd "$PROJECT_DIR/frontend" && npm install --legacy-peer-deps && npm run build && cd "$PROJECT_DIR" && npx electron-builder --win --publish never --config.productName="AI漫剧" --config.appId="com.aicomic.platform" --config.directories.output="release/win" --config.win.target="nsis" --config.win.icon="assets/logo.png" --config.nsis.oneClick=false --config.nsis.allowToChangeInstallationDirectory=true --config.nsis.createDesktopShortcut=true && echo "📦 打包完成" && ls -lh release/win/*.exe 2>/dev/null || echo "⚠️ exe 未生成"
+          - '# ====== [1/2] 修复 @noble/hashes → CJS v1.3.1（操作全局 electron-builder 目录） ======'
+          - echo ">>> Fixing @noble/hashes..." && cd /tmp && rm -rf __nf && mkdir __nf && cd __nf && npm init -y >/dev/null 2>&1 && npm install @noble/hashes@1.3.1 --registry=https://registry.npmmirror.com --legacy-peer-deps && EB_NM="/root/.npm-global/lib/node_modules/electron-builder/node_modules" && find "$EB_NM" -name "@noble" -type d -exec rm -rf {} + 2>/dev/null ; mkdir -p "$EB_NM/@noble" && cp -r node_modules/@noble/hashes "$EB_NM/@noble/hashes" && node -e "var p=require(process.argv[1]);console.log('noble v'+p.version+' type='+(p.type||'cjs'));require(process.argv[2]);console.log('blake2 require OK')" "$EB_NM/@noble/hashes/package.json" "$EB_NM/@noble/hashes/blake2.js"
+          - '# ====== [2/2] 构建前端 + Electron 打包 ======'
+          - export ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ && export ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/ && mkdir -p frontend/dist backend/target release/win && cd frontend && npm install --legacy-peer-deps && npm run build && cd .. && npx electron-builder --win --publish never --config.productName="AI漫剧" --config.appId="com.aicomic.platform" --config.directories.output="release/win" --config.win.target="nsis" --config.win.icon="assets/logo.png" --config.nsis.oneClick=false --config.nsis.allowToChangeInstallationDirectory=true --config.nsis.createDesktopShortcut=true && echo "📦 打包完成" && ls -lh release/win/*.exe 2>/dev/null || echo "⚠️ exe 未生成"
         artifacts:
           - name: win-exe
             path:
