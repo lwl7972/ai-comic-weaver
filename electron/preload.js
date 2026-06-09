@@ -3,7 +3,7 @@
  * 安全地暴露受限 API 给渲染进程 (contextIsolation: true)
  */
 
-const { contextBridge, ipcRenderer } = require('contextbridge')
+const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('electronAPI', {
   /** 获取后端 JVM 端口 */

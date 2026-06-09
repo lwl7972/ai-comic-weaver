@@ -17,34 +17,59 @@ if [ -z "$EB" ]; then
 fi
 
 echo ">>> [fix-noble] Patching $EB..."
-NOBLE="$EB/node_modules/@noble/hashes"
-if [ -d "$NOBLE" ]; then
-  rm -rf "$NOBLE"
-  cp -r "$GNM/@noble/hashes" "$NOBLE"
-else
-  mkdir -p "$(dirname "$NOBLE")"
-  cp -r "$GNM/@noble/hashes" "$NOBLE"
-fi
 
-# 同样修补 app-builder-lib 里的引用（如果存在独立的 node_modules）
-ABL=$(find "$EB" -path '*/app-builder-lib/node_modules' -type d 2>/dev/null | head -1)
-if [ -n "$ABL" ]; then
-  NOBLE2="$ABL/@noble/hashes"
-  if [ -d "$NOBLE2" ] || [ ! -d "$NOBLE2" ]; then
-    rm -rf "$NOBLE2" 2>/dev/null
-    mkdir -p "$(dirname "$NOBLE2")"
-    cp -r "$GNM/@noble/hashes" "$NOBLE2"
-    echo ">>> [fix-noble] Also patched app-builder-lib/node_modules"
+# 修补一个 @noble/hashes 目录：复制 CJS + 删 exports
+patch_one() {
+  local target="$1"
+  echo ">>> [fix-noble]   -> $target"
+  rm -rf "$target" 2>/dev/null
+  mkdir -p "$(dirname "$target")"
+  cp -r "$GNM/@noble/hashes" "$target"
+  # ★ 关键：删除 exports 字段，否则 require('./blake2.js') 仍会被拦截
+  node -e "
+    var fs=require('fs');
+    var pj=JSON.parse(fs.readFileSync('$target/package.json','utf8'));
+    delete pj.exports;
+    fs.writeFileSync('$target/package.json',JSON.stringify(pj,null,2));
+  "
+}
+
+# 修补 electron-builder 顶层的 @noble/hashes
+patch_one "$EB/node_modules/@noble/hashes"
+
+# 修补所有嵌套出现的（app-builder-lib 等包内的独立副本）
+# 使用 for + find 避免管道子 shell 问题
+ALLOBJS=$(find "$EB" -mindepth 3 -path '*/@noble/hashes' -type d 2>/dev/null)
+for NH in $ALLOBJS; do
+  if [ -d "$NH" ]; then
+    patch_one "$NH"
   fi
-fi
+done
 
 # 验证
+echo ">>> [fix-noble] Verifying..."
+
+# 验证顶层
 node -e "
+var fs=require('fs');
 var EP = '$EB/node_modules/@noble/hashes';
-var pk = require(EP + '/package.json');
-console.log('  noble version: v' + pk.version + ' type=' + (pk.type || 'cjs'));
-require(EP + '/blake2.js');
-console.log('  blake2 require: OK');
+var pk = JSON.parse(fs.readFileSync(EP+'/package.json','utf8'));
+console.log('  top-level: v'+pk.version+' exports='+JSON.stringify(pk.exports||'DELETED'));
+try { require(EP+'/blake2.js'); console.log('  top-level require: OK'); }
+catch(e) { console.log('  top-level require: FAIL - '+e.message); }
 "
+
+# 验证嵌套
+for NH in $ALLOBJS; do
+  if [ -d "$NH" ]; then
+    node -e "
+      var fs=require('fs');
+      var pk=JSON.parse(fs.readFileSync('$NH/package.json','utf8'));
+      console.log('  nested: v'+pk.version+' exports='+JSON.stringify(pk.exports||'DELETED'));
+      try { require('$NH/blake2.js'); console.log('  nested require: OK'); }
+      catch(e) { console.log('  nested require: FAIL - '+e.message); }
+    "
+  fi
+done
 
 echo ">>> [fix-noble] Done"
