@@ -81,8 +81,14 @@ stages:
     strategy: naturally
     trigger: auto
     steps:
-      # ★★★ 策略变更：build@nodejs 插件会全局接管含 "electron-builder" 字样的步骤 ★★★
-      #   解决方案：YAML commands 中完全不出现 "electron-builder"，所有逻辑封装到独立脚本
+      # ★★★ build@nodejs 插件行为分析 ★★★
+      #   1. 自动注入: export ELECTRON_MIRROR, ELECTRON_BUILDER_BINARIES_MIRROR
+      #   2. 自动注入: npm install -g electron-builder@latest（含 @noble/hashes@2.x ESM）
+      #   3. 保留中间的用户命令
+      #   4. 替换最后一条命令为: npx electron-builder --win ...（从 electron-builder.json 读配置）
+      #
+      #   对策: 在倒数第二行运行 fix-noble.sh 修补全局 @noble，让插件 auto-generated 的
+      #         npx electron-builder 拿到已修复的 CJS 版本
       - step: build@nodejs
         name: build_electron
         displayName: Electron 打包
@@ -91,8 +97,10 @@ stages:
           - npm config set registry https://registry.npmmirror.com
           - '# ====== [1] 构建前端 ======'
           - mkdir -p frontend/dist backend/target release/win && cd frontend && npm install --legacy-peer-deps && npm run build
-          - '# ====== [2] 修复 @noble/hashes + 打包（全部在独立脚本中，YAML 零引用） ======'
-          - cd .. && bash scripts/electron-build.sh "$PWD"
+          - '# ====== [2] 修复 @noble/hashes（在插件接管打包之前执行） ======'
+          - cd .. && bash scripts/fix-noble.sh
+          - '# ====== [3] 打包（插件会将此行替换为 npx electron-builder） ======'
+          - echo "placeholder for auto-packaging"
         artifacts:
           - name: win-exe
             path:
