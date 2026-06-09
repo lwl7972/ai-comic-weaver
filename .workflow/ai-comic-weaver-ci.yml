@@ -92,11 +92,11 @@ stages:
           - '# 前端构建'
           - cd frontend && npm install --legacy-peer-deps && npm run build && cd ..
           - ''
-          - '# Electron 打包 Windows'
-          - npx electron-builder --win --publish never --config.productName="AI漫剧" --config.appId="com.aicomic.platform" --config.directories.output="release/win" --config.win.target="nsis" --config.win.icon="assets/logo.png" --config.nsis.oneClick=false --config.nsis.allowToChangeInstallationDirectory=true --config.nsis.createDesktopShortcut=true --config.win.signAndEditExecutable=false
+          - '# Electron 打包 Windows（zip，无需 wine）'
+          - npx electron-builder --win --publish never --config.productName="AI漫剧" --config.appId="com.aicomic.platform" --config.directories.output="release/win" --config.win.target="zip" --config.win.icon="assets/logo.png"
           - ''
           - echo "打包完成"
-          - ls -lh release/win/*.exe 2>/dev/null || echo "exe 未生成"
+          - ls -lh release/win/*.zip 2>/dev/null || echo "zip 未生成"
           - ''
         artifacts:
           - name: win_exe
