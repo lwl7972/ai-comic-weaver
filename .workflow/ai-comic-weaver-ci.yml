@@ -113,7 +113,7 @@ stages:
           - ~/.npm
         notify: []
         strategy:
-          retry: '1'
+          retry: '0'
   - name: release
     displayName: 发布 Release
     strategy: naturally
