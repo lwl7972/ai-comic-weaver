@@ -99,16 +99,21 @@ stages:
           - npm config set registry https://registry.npmmirror.com
           - '# ====== [0] 修补 @noble/hashes（插件安装 electron-builder 后立即执行） ======'
           - bash scripts/fix-noble.sh
-          - '# ====== [1] 构建前端 ======'
-          - mkdir -p frontend/dist backend/target release/win && cd frontend && npm install --legacy-peer-deps && npm run build
+          - '# ====== [1] 构建前端（用子shell避免cd问题） ======'
+          - (cd frontend && npm install --legacy-peer-deps && npm run build)
+          - '# ====== [2] 构建后端（用子shell避免cd问题） ======'
+          - (cd backend && mvn clean package -Dmaven.test.skip=true -B -q)
         artifacts:
           - name: win-exe
             path:
-              - ./release/win/*.exe
+              - ./*.exe
+              - ./release/*.exe
           - name: win-update
             path:
-              - ./release/win/*.yml
-              - ./release/win/*.blockmap
+              - ./*.yml
+              - ./*.blockmap
+              - ./release/*.yml
+              - ./release/*.blockmap
         caches:
           - ~/.npm
         notify: []
