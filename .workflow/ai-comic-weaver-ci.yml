@@ -80,7 +80,10 @@ stages:
           - export ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/
           - export ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/
           - ''
-          - '# 安装项目依赖（含 electron-builder，版本由 package.json 锁定，不会引入 @noble/hashes@2.x）'
+          - '# ★★★ 禁掉代码签名（CI 环境无证书）★★★'
+          - export CSC_IDENTITY_AUTO_DISCOVERY=false
+          - ''
+          - '# 安装项目依赖'
           - npm install --legacy-peer-deps
           - ''
           - '# 确保产物目录存在'
@@ -89,8 +92,8 @@ stages:
           - '# 前端构建'
           - cd frontend && npm install --legacy-peer-deps && npm run build && cd ..
           - ''
-          - '# Electron 打包 Windows（npm install 已装了本地 electron-builder）'
-          - npx electron-builder --win --publish never --config.productName="AI漫剧" --config.appId="com.aicomic.platform" --config.directories.output="release/win" --config.win.target="nsis" --config.win.icon="assets/logo.png" --config.nsis.oneClick=false --config.nsis.allowToChangeInstallationDirectory=true --config.nsis.createDesktopShortcut=true
+          - '# Electron 打包 Windows'
+          - npx electron-builder --win --publish never --config.productName="AI漫剧" --config.appId="com.aicomic.platform" --config.directories.output="release/win" --config.win.target="nsis" --config.win.icon="assets/logo.png" --config.nsis.oneClick=false --config.nsis.allowToChangeInstallationDirectory=true --config.nsis.createDesktopShortcut=true --config.win.signAndEditExecutable=false
           - ''
           - echo "打包完成"
           - ls -lh release/win/*.exe 2>/dev/null || echo "exe 未生成"
