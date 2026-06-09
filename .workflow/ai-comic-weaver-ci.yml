@@ -98,8 +98,11 @@ stages:
           - '# Electron 打包 Windows（NSIS 安装器）'
           - npx electron-builder --win --publish never --config.productName="AI漫剧" --config.appId="com.aicomic.platform" --config.directories.output="release/win" --config.win.target="nsis" --config.win.icon="assets/logo.png" --config.nsis.oneClick=false --config.nsis.allowToChangeInstallationDirectory=true --config.nsis.createDesktopShortcut=true
           - ''
+          - '# ★★★ 重命名：去掉文件名空格，Gitee Go 产物收集不支持空格 ★★★'
+          - mv "release/win/AI漫剧 Setup 0.1.0.exe" release/win/AI漫剧_Setup_0.1.0.exe
+          - ''
           - echo "打包完成"
-          - ls -lh "release/win/"*.exe 2>/dev/null || echo "exe 未生成"
+          - ls -lh release/win/*.exe 2>/dev/null || echo "exe 未生成"
           - ''
         artifacts:
           - name: win_exe
