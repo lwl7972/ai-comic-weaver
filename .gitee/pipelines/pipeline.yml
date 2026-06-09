@@ -140,7 +140,7 @@ stages:
 
           | 平台 | 文件 |
           |------|------|
-          | Windows | AI漫剧-Setup-x64.exe |
+          | Windows | AI漫剧_Setup_0.1.0.exe |
 
           > 首次启动需要等待 JVM 初始化（约 5-10 秒）
 
@@ -148,7 +148,7 @@ stages:
           *由 Gitee Go 自动构建发布*
         tagName: v${VERSION}
         upstreamArtifact:
-          - win-exe       # ★ 修改：引用 Electron 的产物
+          - win_exe
         assertFiles: null
         prerelease: false
         allowUpdate: true
