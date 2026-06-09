@@ -76,27 +76,24 @@ stages:
           - '# 设置NPM源'
           - npm config set registry https://registry.npmmirror.com
           - ''
-          - '# ★ 关键：Electron 国内镜像加速（必须）'
+          - '# ★ 关键：Electron 国内镜像加速'
           - export ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/
           - export ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/
           - ''
-          - '# 安装 electron-builder'
-          - npm install -g electron-builder@latest
-          - ''
-          - '# ★★★ 修补 @noble/hashes ESM 兼容问题（新增这一行）★★★'
-          - bash scripts/fix-noble.sh
+          - '# 安装项目依赖（含 electron-builder，版本由 package.json 锁定，不会引入 @noble/hashes@2.x）'
+          - npm install --legacy-peer-deps
           - ''
           - '# 确保产物目录存在'
           - mkdir -p frontend/dist backend/target release/win
           - ''
-          - '# 前端构建 (用 npm install 替代 npm ci)'
+          - '# 前端构建'
           - cd frontend && npm install --legacy-peer-deps && npm run build && cd ..
           - ''
-          - '# Electron 打包 Windows'
+          - '# Electron 打包 Windows（npm install 已装了本地 electron-builder）'
           - npx electron-builder --win --publish never --config.productName="AI漫剧" --config.appId="com.aicomic.platform" --config.directories.output="release/win" --config.win.target="nsis" --config.win.icon="assets/logo.png" --config.nsis.oneClick=false --config.nsis.allowToChangeInstallationDirectory=true --config.nsis.createDesktopShortcut=true
           - ''
-          - echo "📦 打包完成"
-          - ls -lh release/win/*.exe 2>/dev/null || echo "⚠️ exe 未生成"
+          - echo "打包完成"
+          - ls -lh release/win/*.exe 2>/dev/null || echo "exe 未生成"
           - ''
         artifacts:
           - name: win_exe
