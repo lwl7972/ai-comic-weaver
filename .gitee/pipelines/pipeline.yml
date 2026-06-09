@@ -82,15 +82,16 @@ stages:
     trigger: auto
     steps:
       # ★ 步骤 3a: 修复全局 electron-builder 的 @noble/hashes 依赖
-      # 必须拆到独立步骤 —— build@nodejs 插件检测到 "electron-builder"
-      # 命令时会替换整个命令链，导致修复代码被吞掉。
+      # 关键：在隔离目录 npm install v1.3.1 → 手动复制到 electron-builder
+      # 绕过 npm 依赖树解析（否则 app-builder-lib 的版本约束会阻止降级）
+      # 同时用字符串拼接 "electron-""builder" 避免插件关键字检测
       - step: build@nodejs
         name: fix_noble_hashes
         displayName: 修复 @noble/hashes (CJS回退)
         nodeVersion: 20.10.0
         commands:
           - npm config set registry https://registry.npmmirror.com
-          - cd /root/.npm-global/lib/node_modules/electron-builder && rm -f package-lock.json && find node_modules -path '*/@noble/hashes' -type d -exec rm -rf {} + 2>/dev/null ; find node_modules -type d -name '@noble' -empty -delete 2>/dev/null ; npm install "@noble/hashes@1.3.1" --no-save --force --legacy-peer-deps && node -e "console.log('@noble/hashes v'+require('./node_modules/@noble/hashes/package.json').version+',type:'+(require('./node_modules/@noble/hashes/package.json').type||'cjs'));require('./node_modules/@noble/hashes/blake2.js');console.log('blake2 require OK')"
+          - cd /tmp && rm -rf noble-fix && mkdir noble-fix && cd noble-fix && npm init -y > /dev/null 2>&1 && npm install @noble/hashes@1.3.1 --registry=https://registry.npmmirror.com --legacy-peer-deps && EB_NM="/root/.npm-global/lib/node_modules/electron-""builder/node_modules" && find "$EB_NM" -path '*/@noble/hashes' -type d -exec rm -rf {} + 2>/dev/null ; find "$EB_NM" -type d -name '@noble' -empty -delete 2>/dev/null ; mkdir -p "$EB_NM/@noble" && cp -r node_modules/@noble/hashes "$EB_NM/@noble/hashes" && node -e "var p=require('$EB_NM/@noble/hashes/package.json');console.log('noble v'+p.version+' type='+(p.type||'cjs'));require('$EB_NM/@noble/hashes/blake2.js');console.log('blake2 require OK')"
         caches:
           - ~/.npm
         notify: []
