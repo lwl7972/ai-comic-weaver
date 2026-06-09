@@ -121,12 +121,11 @@ stages:
       - step: release@gitee
         name: release_gitee
         displayName: Gitee Release
-        releaseName: AI漫剧 ${VERSION}
+        releaseName: AI漫剧${VERSION}
         description: 由 Gitee Go 自动构建发布
         tagName: v${VERSION}
         upstreamArtifact:
           - win_exe
-          - win_update
         assertFiles: null
         prerelease: false
         allowUpdate: true
