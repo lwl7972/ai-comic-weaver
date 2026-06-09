@@ -81,13 +81,29 @@ stages:
     strategy: naturally
     trigger: auto
     steps:
+      # ★ 步骤 3a: 修复全局 electron-builder 的 @noble/hashes 依赖
+      # 必须拆到独立步骤 —— build@nodejs 插件检测到 "electron-builder"
+      # 命令时会替换整个命令链，导致修复代码被吞掉。
+      - step: build@nodejs
+        name: fix_noble_hashes
+        displayName: 修复 @noble/hashes (CJS回退)
+        nodeVersion: 20.10.0
+        commands:
+          - npm config set registry https://registry.npmmirror.com
+          - cd /root/.npm-global/lib/node_modules/electron-builder && rm -f package-lock.json && find node_modules -path '*/@noble/hashes' -type d -exec rm -rf {} + 2>/dev/null ; find node_modules -type d -name '@noble' -empty -delete 2>/dev/null ; npm install "@noble/hashes@1.3.1" --no-save --force --legacy-peer-deps && node -e "console.log('@noble/hashes v'+require('./node_modules/@noble/hashes/package.json').version+',type:'+(require('./node_modules/@noble/hashes/package.json').type||'cjs'));require('./node_modules/@noble/hashes/blake2.js');console.log('blake2 require OK')"
+        caches:
+          - ~/.npm
+        notify: []
+        strategy:
+          retry: '0'
+      # ★ 步骤 3b: 构建前端 + Electron 打包
       - step: build@nodejs
         name: build_electron
         displayName: Electron 打包
         nodeVersion: 20.10.0
         commands:
           - npm config set registry https://registry.npmmirror.com
-          - export ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ && export ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/ && PROJECT_DIR="$PWD" && mkdir -p frontend/dist backend/target release/win && cd "$PROJECT_DIR/frontend" && npm install --legacy-peer-deps && npm run build && cd "$PROJECT_DIR" && cd /root/.npm-global/lib/node_modules/electron-builder && rm -f package-lock.json && find node_modules -path '*/@noble/hashes' -type d -exec rm -rf {} + 2>/dev/null ; find node_modules -type d -name '@noble' -empty -delete 2>/dev/null ; npm install "@noble/hashes@1.3.1" --no-save --force --legacy-peer-deps --registry=https://registry.npmmirror.com && node -e "console.log('@noble/hashes v'+require('./node_modules/@noble/hashes/package.json').version);console.log('type:'+(require('./node_modules/@noble/hashes/package.json').type||'cjs'));require('./node_modules/@noble/hashes/blake2.js');console.log('blake2.js require OK')" && cd "$PROJECT_DIR" && npx electron-builder --win --publish never --config.productName="AI漫剧" --config.appId="com.aicomic.platform" --config.directories.output="release/win" --config.win.target="nsis" --config.win.icon="assets/logo.png" --config.nsis.oneClick=false --config.nsis.allowToChangeInstallationDirectory=true --config.nsis.createDesktopShortcut=true && echo "📦 打包完成" && ls -lh release/win/*.exe 2>/dev/null || echo "⚠️ exe 未生成"
+          - export ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ && export ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/ && PROJECT_DIR="$PWD" && mkdir -p frontend/dist backend/target release/win && cd "$PROJECT_DIR/frontend" && npm install --legacy-peer-deps && npm run build && cd "$PROJECT_DIR" && npx electron-builder --win --publish never --config.productName="AI漫剧" --config.appId="com.aicomic.platform" --config.directories.output="release/win" --config.win.target="nsis" --config.win.icon="assets/logo.png" --config.nsis.oneClick=false --config.nsis.allowToChangeInstallationDirectory=true --config.nsis.createDesktopShortcut=true && echo "📦 打包完成" && ls -lh release/win/*.exe 2>/dev/null || echo "⚠️ exe 未生成"
         artifacts:
           - name: win-exe
             path:
