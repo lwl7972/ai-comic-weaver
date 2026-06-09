@@ -82,26 +82,25 @@ stages:
     trigger: auto
     steps:
       # ★★★ build@nodejs 插件行为分析 ★★★
-      #   1. 自动注入: export ELECTRON_MIRROR, ELECTRON_BUILDER_BINARIES_MIRROR
-      #   2. 自动注入: npm install -g electron-builder@latest（含 @noble/hashes@2.x ESM）
-      #   3. 保留中间的用户命令
-      #   4. 替换最后一条命令为: npx electron-builder --win ...（从 electron-builder.json 读配置）
+      #   1. 保留第1条用户命令
+      #   2. 自动注入: export ELECTRON_MIRROR, ELECTRON_BUILDER_BINARIES_MIRROR
+      #   3. 自动注入: npm install -g electron-builder@latest（含 @noble/hashes@2.x ESM）
+      #   4. 保留后续用户命令（仅限构建相关）
+      #   5. 从第一个 cd .. 开始，丢弃所有后续用户命令，替换为 npx electron-builder
       #
-      #   对策: 在倒数第二行运行 fix-noble.sh 修补全局 @noble，让插件 auto-generated 的
-      #         npx electron-builder 拿到已修复的 CJS 版本
+      #   对策: fix-noble.sh 放在第2条命令（插件注入 electron-builder 之后立即执行修补）
+      #         前端构建放在第3条命令
+      #         不在 YAML 中写任何 cd .. 或打包相关命令，让插件自动生成
       - step: build@nodejs
         name: build_electron
         displayName: Electron 打包
         nodeVersion: 20.10.0
         commands:
           - npm config set registry https://registry.npmmirror.com
+          - '# ====== [0] 修补 @noble/hashes（插件安装 electron-builder 后立即执行） ======'
+          - bash scripts/fix-noble.sh
           - '# ====== [1] 构建前端 ======'
           - mkdir -p frontend/dist backend/target release/win && cd frontend && npm install --legacy-peer-deps && npm run build
-          - '# ====== [2] 修复 @noble/hashes（在插件接管打包之前执行） ======'
-          - cd ..
-          - bash scripts/fix-noble.sh
-          - '# ====== [3] 打包（插件会将此行替换为 npx electron-builder） ======'
-          - echo "placeholder for auto-packaging"
         artifacts:
           - name: win-exe
             path:
