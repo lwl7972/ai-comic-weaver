@@ -83,8 +83,8 @@ stages:
           - '# ★★★ 禁掉代码签名 ★★★'
           - export CSC_IDENTITY_AUTO_DISCOVERY=false
           - ''
-          - '# 安装 wine（NSIS 编译器需要）'
-          - apt-get update -qq && apt-get install -y -qq wine
+          - '# 安装 wine（NSIS + rcedit 需要 wine32）'
+          - dpkg --add-architecture i386 && apt-get update -qq && apt-get install -y -qq wine wine32
           - ''
           - '# 安装项目依赖'
           - npm install --legacy-peer-deps
