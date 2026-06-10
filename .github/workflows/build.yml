@@ -1,0 +1,89 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ============================================================
+      # Backend: Java 17 + Maven
+      # ============================================================
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Build backend
+        run: cd backend && mvn clean package -DskipTests -B
+
+      # Rename jar to fixed name (electron expects this)
+      - name: Prepare backend jar
+        run: |
+          mkdir -p backend/target
+          copy backend\target\ai-comic-platform-0.1.0.jar backend\target\ai-comic-platform.jar
+
+      # ============================================================
+      # Frontend: Node.js + Vite
+      # ============================================================
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install root deps
+        run: npm install --legacy-peer-deps
+
+      - name: Build frontend
+        run: cd frontend && npm install --legacy-peer-deps && npm run build
+
+      # ============================================================
+      # Electron: NSIS packaging (native on Windows, no wine needed!)
+      # ============================================================
+      - name: Package Electron (NSIS)
+        run: npx electron-builder --win --publish never
+
+      # ============================================================
+      # Upload artifacts
+      # ============================================================
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer
+          path: release/*.exe
+
+      # ============================================================
+      # GitHub Release (only on tag push)
+      # ============================================================
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "AI漫剧 ${{ github.ref_name }}"
+          body: |
+            ## AI漫剧制作平台 ${{ github.ref_name }}
+
+            ### 功能特性
+            - Vue3 + Element Plus 前端界面
+            - Spring Boot 后端 + SQLite
+            - Electron 桌面端 (NSIS 安装包)
+
+            ### 下载安装包
+            下载下方的 `AI漫剧 Setup 0.1.0.exe` 安装即可。
+
+            > 安装后运行 AI漫剧.exe，首次启动需等待 JVM 初始化（约 5-10 秒）
+          files: release/*.exe
+          draft: false
+          prerelease: false

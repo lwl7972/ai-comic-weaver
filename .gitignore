@@ -44,3 +44,9 @@ cache/
 
 # JVM
 hs_err_pid*
+
+# Release output (not committed, built by CI)
+release/
+
+# Gitee pipeline (migrating to GitHub)
+.gitee/
