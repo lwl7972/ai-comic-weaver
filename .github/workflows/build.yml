@@ -51,19 +51,23 @@ jobs:
         run: cd frontend && npm install --legacy-peer-deps && npm run build
 
       # ============================================================
-      # Electron: NSIS packaging (native on Windows, no wine needed!)
+      # Electron: NSIS packaging (latest.yml always generated for auto-updater)
+      # Release publishing handled by softprops/action-gh-release below
       # ============================================================
       - name: Package Electron (NSIS)
         run: npx electron-builder --win --publish never
 
       # ============================================================
-      # Upload artifacts
+      # Upload artifacts (always, include latest.yml for auto-updater)
       # ============================================================
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
           name: installer
-          path: release/*.exe
+          path: |
+            release/*.exe
+            release/latest.yml
+            release/*.blockmap
 
       # ============================================================
       # GitHub Release (only on tag push)
@@ -80,11 +84,15 @@ jobs:
             - Vue3 + Element Plus 前端界面
             - Spring Boot 后端 + SQLite
             - Electron 桌面端 (NSIS 安装包)
+            - 🆕 内置自动更新检测
 
             ### 下载安装包
-            下载下方的 `AI漫剧 Setup 0.1.0.exe` 安装即可。
+            下载下方的 `AI漫剧_Setup_${{ github.ref_name }}.exe` 安装即可。
 
             > 安装后运行 AI漫剧.exe，首次启动需等待 JVM 初始化（约 5-10 秒）
-          files: release/*.exe
+          files: |
+            release/*.exe
+            release/latest.yml
+            release/*.blockmap
           draft: false
           prerelease: false

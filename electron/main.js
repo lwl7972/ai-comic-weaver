@@ -2,11 +2,16 @@ const { app, BrowserWindow, ipcMain } = require('electron')
 const path = require('path')
 const { spawn } = require('child_process')
 const net = require('net')
+const { autoUpdater } = require('electron-updater')
 
 // ============================================================
 // AI漫剧制作平台 - Electron 主进程
 // ADR-2: Electron 内嵌 JVM（spawn 子进程 + 随机端口 ADR-18）
 // ============================================================
+
+// Configure auto-updater
+autoUpdater.autoDownload = false
+autoUpdater.autoInstallOnAppQuit = true
 
 let mainWindow = null
 let jvmProcess = null
@@ -140,6 +145,45 @@ async function detectFreePort() {
 }
 
 // ============================================================
+// 自动更新 (electron-updater → GitHub Releases)
+// ============================================================
+
+function setupAutoUpdater() {
+  // Forward updater events to renderer
+  autoUpdater.on('update-available', (info) => {
+    console.log('[Updater] Update available:', info.version)
+    mainWindow?.webContents.send('update-available', info)
+  })
+
+  autoUpdater.on('update-not-available', (info) => {
+    console.log('[Updater] Already up to date:', info.version)
+    mainWindow?.webContents.send('update-not-available', info)
+  })
+
+  autoUpdater.on('download-progress', (progress) => {
+    console.log(`[Updater] Download: ${progress.percent.toFixed(1)}%`)
+    mainWindow?.webContents.send('download-progress', progress)
+  })
+
+  autoUpdater.on('update-downloaded', (info) => {
+    console.log('[Updater] Update downloaded:', info.version)
+    mainWindow?.webContents.send('update-downloaded', info)
+  })
+
+  autoUpdater.on('error', (err) => {
+    console.error('[Updater] Error:', err.message)
+    mainWindow?.webContents.send('update-error', { message: err.message })
+  })
+
+  // Auto-check on startup (3s delay to let UI load)
+  setTimeout(() => {
+    autoUpdater.checkForUpdates().catch((err) => {
+      console.log('[Updater] Startup check skipped:', err.message)
+    })
+  }, 3000)
+}
+
+// ============================================================
 // App Lifecycle
 // ============================================================
 
@@ -148,6 +192,7 @@ app.whenReady().then(async () => {
   global.backendPort = port
   createWindow()
   startBackend()
+  setupAutoUpdater()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -171,4 +216,37 @@ ipcMain.handle('get-backend-port', () => global.backendPort)
 
 ipcMain.handle('app-version', () => app.getVersion())
 
+ipcMain.handle('app-versions', () => ({
+  electron: process.versions.electron,
+  chrome: process.versions.chrome,
+  node: process.versions.node,
+  platform: process.platform,
+}))
+
 ipcMain.handle('get-app-path', () => app.getAppPath())
+
+// ============================================================
+// Auto-updater IPC handlers
+// ============================================================
+
+ipcMain.handle('check-for-update', async () => {
+  try {
+    const result = await autoUpdater.checkForUpdates()
+    return { available: !!result, version: result?.updateInfo?.version || app.getVersion() }
+  } catch (err) {
+    return { available: false, error: err.message }
+  }
+})
+
+ipcMain.handle('download-update', async () => {
+  try {
+    await autoUpdater.downloadUpdate()
+    return { success: true }
+  } catch (err) {
+    return { success: false, error: err.message }
+  }
+})
+
+ipcMain.handle('quit-and-install', () => {
+  autoUpdater.quitAndInstall()
+})
