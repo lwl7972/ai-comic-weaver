@@ -1,8 +1,9 @@
 <template>
   <div class="view-container">
-    <h2>📝 剧本模块</h2>
+    <h2>剧本模块</h2>
     <p class="description">小说导入、AI大纲生成、剧本创作与分集管理</p>
-    <!-- TODO: implement script module UI -->
+
+    <el-empty description="暂无数据" />
   </div>
 </template>
 
@@ -10,6 +11,11 @@
 </script>
 
 <style scoped>
-.view-container h2 { margin: 0 0 8px; }
-.description { color: #666; }
+.view-container h2 {
+  margin: 0 0 8px;
+}
+.description {
+  color: #666;
+  margin-bottom: 20px;
+}
 </style>

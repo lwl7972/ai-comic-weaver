@@ -1,5 +1,6 @@
 import axios from 'axios'
 import type { AxiosInstance } from 'axios'
+import { ElMessage } from 'element-plus'
 
 /**
  * HTTP 客户端 - 统一请求封装
@@ -28,15 +29,22 @@ http.interceptors.request.use(async (config) => {
   return Promise.reject(error)
 })
 
-// Response interceptor: unwrap unified response format
+// Response interceptor: unwrap unified response format + global error toast
 http.interceptors.response.use(
   (response) => {
     const { code, message, data } = response.data
     if (code === 0) return { ...response, data }
-    return Promise.reject(new Error(message || 'Request failed'))
+    // Business error: show toast and reject
+    const msg = message || '请求失败'
+    ElMessage.error(msg)
+    return Promise.reject(new Error(msg))
   },
   (error) => {
-    const msg = error.response?.data?.message || error.message
+    const msg = error.response?.data?.message || error.message || '网络错误'
+    // Only show toast for non-cancelled requests
+    if (error.code !== 'ERR_CANCELED') {
+      ElMessage.error(msg)
+    }
     return Promise.reject(new Error(msg))
   },
 )

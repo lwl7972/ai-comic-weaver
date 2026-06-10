@@ -58,6 +58,13 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/config/ConfigView.vue'),
         meta: { title: '配置中心', icon: 'Setting' },
       },
+      // 404 兜底
+      {
+        path: '/:pathMatch(.*)*',
+        name: 'NotFound',
+        component: () => import('@/views/NotFound.vue'),
+        meta: { title: '页面不存在' },
+      },
     ],
   },
 ]
@@ -65,6 +72,14 @@ const routes: RouteRecordRaw[] = [
 const router = createRouter({
   history: createWebHistory(),
   routes,
+})
+
+// 全局路由守卫 - 设置页面标题
+router.beforeEach((to, _from, next) => {
+  // 设置页面标题
+  const title = to.meta.title as string
+  document.title = title ? `${title} - AI漫剧制作平台` : 'AI漫剧制作平台'
+  next()
 })
 
 export default router

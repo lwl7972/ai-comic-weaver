@@ -1,7 +1,9 @@
 package com.aicomic.entity;
 
-import jakarta.persistence.*;
-import lombok.Data;
+import javax.persistence.*;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -18,11 +20,14 @@ import java.time.LocalDateTime;
  */
 @Entity
 @Table(name = "model_config")
-@Data
+@Getter
+@Setter
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class ModelConfig {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
     private Long id;
 
     @Column(nullable = false)
@@ -59,6 +64,22 @@ public class ModelConfig {
     /** 优先级 (用于多Key轮询) */
     private Integer priority = 0;
 
+    /** 工作流 ID (Coze/其他工作流平台) */
+    @Column(name = "workflow_id")
+    private String workflowId;
+
+    /** Bot ID (Coze 专用) */
+    @Column(name = "bot_id")
+    private String botId;
+
+    /** 应用 ID (Coze 专用) */
+    @Column(name = "app_id")
+    private String appId;
+
+    /** 是否为 Coze 工作流 */
+    @Column(name = "is_coze_workflow")
+    private Boolean isCozeWorkflow = false;
+
     @CreationTimestamp
     private LocalDateTime createdAt;
 
@@ -78,6 +99,6 @@ public class ModelConfig {
     }
 
     public enum ModelType {
-        TEXT, IMAGE, VIDEO, AUDIO
+        TEXT, IMAGE, VIDEO, AUDIO, WORKFLOW
     }
 }

@@ -33,8 +33,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { Plus } from '@element-plus/icons-vue'
+import { useProjectStore } from '@/stores/project'
 
 interface ProjectItem {
   id: number
@@ -44,7 +45,13 @@ interface ProjectItem {
   updatedAt: string
 }
 
+const projectStore = useProjectStore()
 const projects = ref<ProjectItem[]>([])
+
+onMounted(async () => {
+  await projectStore.fetchProjects()
+  projects.value = projectStore.projectList as unknown as ProjectItem[]
+})
 
 function handleCreate() {
   // TODO: open project creation dialog

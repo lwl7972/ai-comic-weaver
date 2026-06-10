@@ -1,7 +1,9 @@
 package com.aicomic.entity;
 
-import jakarta.persistence.*;
-import lombok.Data;
+import javax.persistence.*;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -11,12 +13,15 @@ import java.time.LocalDateTime;
  * 5.5 剧集表
  */
 @Entity
-@Table(name = "episode")
-@Data
+@Table(name = "episode", indexes = {@Index(name = "idx_episode_script_id", columnList = "scriptId")})
+@Getter
+@Setter
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class Episode {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
     private Long id;
 
     @Column(name = "script_id", nullable = false)

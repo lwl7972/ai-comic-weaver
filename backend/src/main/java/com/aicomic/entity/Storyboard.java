@@ -1,7 +1,9 @@
 package com.aicomic.entity;
 
-import jakarta.persistence.*;
-import lombok.Data;
+import javax.persistence.*;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -12,12 +14,15 @@ import java.time.LocalDateTime;
  * 支持专业电影级参数: 景别/机位/运镜/情绪
  */
 @Entity
-@Table(name = "storyboard")
-@Data
+@Table(name = "storyboard", indexes = {@Index(name = "idx_storyboard_episode_id", columnList = "episodeId")}, uniqueConstraints = {@UniqueConstraint(name = "uk_storyboard_episode_seq", columnNames = {"episodeId", "sequence"})})
+@Getter
+@Setter
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class Storyboard {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
     private Long id;
 
     @Column(name = "episode_id", nullable = false)

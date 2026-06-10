@@ -4,6 +4,7 @@ import com.aicomic.common.response.ApiResponse;
 import com.aicomic.entity.AppConfig;
 import com.aicomic.repository.AppConfigRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -16,7 +17,6 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/app-config")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 public class AppConfigController {
 
     private final AppConfigRepository appConfigRepository;
@@ -32,9 +32,10 @@ public class AppConfigController {
 
     /** PUT /api/v1/app-config - 批量更新配置 */
     @PutMapping
+    @Transactional
     public ApiResponse<Void> updateConfig(@RequestBody Map<String, String> updates) {
-        for (var entry : updates.entrySet()) {
-            var config = appConfigRepository.findByKey(entry.getKey())
+        for (Map.Entry<String, String> entry : updates.entrySet()) {
+            AppConfig config = appConfigRepository.findByKey(entry.getKey())
                     .orElse(new AppConfig());
             config.setKey(entry.getKey());
             config.setValue(entry.getValue());
@@ -48,6 +49,6 @@ public class AppConfigController {
     public ApiResponse<String> getConfig(@PathVariable String key) {
         return appConfigRepository.findByKey(key)
                 .map(c -> ApiResponse.success(c.getValue()))
-                .orElseGet(() -> ApiResponse.error(10004, "配置项不存在: " + key));
+                .orElseGet(() -> ApiResponse.error(ApiResponse.CONFIG_NOT_FOUND, "配置项不存在: " + key));
     }
 }

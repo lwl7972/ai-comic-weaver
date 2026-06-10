@@ -12,4 +12,6 @@ public interface SceneRepository extends JpaRepository<Scene, Long> {
     List<Scene> findByProjectIdOrderByNameAsc(Long projectId);
 
     List<Scene> findByProjectIdAndConfirmedAtIsNotNull(Long projectId);
+
+    void deleteByProjectId(Long projectId);
 }

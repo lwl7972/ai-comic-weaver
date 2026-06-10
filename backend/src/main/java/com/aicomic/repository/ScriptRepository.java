@@ -12,5 +12,7 @@ public interface ScriptRepository extends JpaRepository<Script, Long> {
 
     List<Script> findByProjectIdOrderByCreatedAtDesc(Long projectId);
 
-    Optional<Script> findByProjectId(Long projectId);
+    Optional<Script> findTopByProjectIdOrderByCreatedAtDesc(Long projectId);
+
+    void deleteByProjectId(Long projectId);
 }

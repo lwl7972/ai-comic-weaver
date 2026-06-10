@@ -27,7 +27,7 @@
 
 | 变量名 | 值 | 说明 |
 |--------|-----|------|
-| `GITCODE_TOKEN` | `upmkdu_x9BChx2NCwBhGUmi-` | 您的 Personal Access Token |
+| `GITCODE_TOKEN` | `<YOUR_GITCODE_TOKEN_HERE>` | 您的 Personal Access Token |
 
 3. 勾选 **「受保护变量」** 和 **「隐藏变量」** ✅
 4. 点击 **「保存变量」**

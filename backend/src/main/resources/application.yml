@@ -10,7 +10,7 @@ spring:
     driver-class-name: org.sqlite.JDBC
 
   jpa:
-    database-platform: org.hibernate.community.dialect.SQLiteDialect
+    database-platform: com.aicomic.common.config.SQLiteDialect
     hibernate:
       ddl-auto: update
     show-sql: false
@@ -32,6 +32,12 @@ app:
     backup-dir: ./data/backups
   # Random port for Electron spawn mode (overridden at runtime by main process)
   random-port: ${RANDOM_PORT:8080}
+
+# CORS configuration - 生产环境请替换为具体域名
+# 当前允许所有来源，适合本地开发；部署时建议改为:
+#   allowed-origins: https://your-domain.com
+cors:
+  allowed-origins: "*"
 
 logging:
   level:

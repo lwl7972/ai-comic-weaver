@@ -1,7 +1,9 @@
 package com.aicomic.entity;
 
-import jakarta.persistence.*;
-import lombok.Data;
+import javax.persistence.*;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -13,12 +15,15 @@ import java.time.LocalDateTime;
  * 跟踪对象类型: SCRIPT / EPISODE / CHARACTER / SCENE / STORYBOARD
  */
 @Entity
-@Table(name = "version_history")
-@Data
+@Table(name = "version_history", indexes = {@Index(name = "idx_version_history_object", columnList = "objectId, objectType")})
+@Getter
+@Setter
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class VersionHistory {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
     private Long id;
 
     /** 对象类型 */

@@ -20,7 +20,7 @@
 
 | 变量名 | 值 | 类型 |
 |--------|-----|------|
-| `ACCESS_TOKEN` | `292a18e3bdd03e83f231d5e6129fcc5` | 密码（加密） |
+| `ACCESS_TOKEN` | `<YOUR_GITEE_ACCESS_TOKEN_HERE>` | 密码（加密） |
 
 3. 保存 ✅
 

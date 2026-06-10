@@ -1,7 +1,9 @@
 package com.aicomic.entity;
 
-import jakarta.persistence.*;
-import lombok.Data;
+import javax.persistence.*;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -11,12 +13,15 @@ import java.time.LocalDateTime;
  * 5.6 角色表 - 支持6层身份锚点 (ADR-10) 和角色圣经管理
  */
 @Entity
-@Table(name = "character")
-@Data
+@Table(name = "character", indexes = {@Index(name = "idx_character_project_id", columnList = "projectId")})
+@Getter
+@Setter
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class Character {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
     private Long id;
 
     @Column(name = "project_id", nullable = false)

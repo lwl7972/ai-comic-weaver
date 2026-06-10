@@ -83,8 +83,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
+import sseClient from '@/utils/sse'
+import { useNotificationStore } from '@/stores/notification'
 import {
   Document, UserFilled, PictureFilled, Film,
   VideoCamera, Star, FolderOpened, Setting,
@@ -92,12 +94,34 @@ import {
 
 const route = useRoute()
 const currentRoute = computed(() => route.path)
+const notificationStore = useNotificationStore()
+
 const pipelineActiveStep = computed(() => {
   const stepMap: Record<string, number> = {
     '/script': 0, '/character': 1, '/scene': 2,
     '/storyboard': 3, '/director': 4, '/s-level': 5,
   }
   return stepMap[route.path] ?? -1
+})
+
+onMounted(() => {
+  // 连接 SSE 实时推送
+  sseClient.on('notification', (data: any) => {
+    const store = useNotificationStore()
+    switch (data.type) {
+      case 'success': store.success(data.message); break
+      case 'warning': store.warning(data.message); break
+      case 'error': store.error(data.message); break
+      default: store.info(data.message)
+    }
+  })
+  sseClient.connect()
+})
+
+onUnmounted(() => {
+  // 路由组件销毁时断开 SSE 连接，避免内存泄漏
+  sseClient.disconnect()
+  notificationStore.cleanup()
 })
 </script>
 

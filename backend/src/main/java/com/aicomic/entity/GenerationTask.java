@@ -1,7 +1,9 @@
 package com.aicomic.entity;
 
-import jakarta.persistence.*;
-import lombok.Data;
+import javax.persistence.*;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
@@ -12,12 +14,15 @@ import java.time.LocalDateTime;
  * 任务调度方案 (ADR-8): Spring @Async + ThreadPoolTaskExecutor
  */
 @Entity
-@Table(name = "generation_task")
-@Data
+@Table(name = "generation_task", indexes = {@Index(name = "idx_generation_task_target", columnList = "targetType, targetId")})
+@Getter
+@Setter
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class GenerationTask {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
     private Long id;
 
     /** 生成用途 (ADR-7) */

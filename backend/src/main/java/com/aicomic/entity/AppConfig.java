@@ -1,7 +1,9 @@
 package com.aicomic.entity;
 
-import jakarta.persistence.*;
-import lombok.Data;
+import javax.persistence.*;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
@@ -18,18 +20,21 @@ import java.time.LocalDateTime;
  */
 @Entity
 @Table(name = "app_config")
-@Data
+@Getter
+@Setter
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class AppConfig {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
     private Long id;
 
-    @Column(nullable = false, unique = true)
+    @Column(name = "config_key", nullable = false, unique = true, length = 128)
     private String key;
 
     @Lob
-    @Column(columnDefinition = "TEXT")
+    @Column(name = "config_value", columnDefinition = "TEXT")
     private String value;
 
     private String description;

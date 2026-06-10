@@ -1,7 +1,9 @@
 package com.aicomic.entity;
 
-import jakarta.persistence.*;
-import lombok.Data;
+import javax.persistence.*;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
@@ -13,12 +15,15 @@ import java.time.LocalDateTime;
  * 用户在此表中逐一确认入库。
  */
 @Entity
-@Table(name = "extracted_asset")
-@Data
+@Table(name = "extracted_asset", indexes = {@Index(name = "idx_extracted_asset_project_id", columnList = "projectId")})
+@Getter
+@Setter
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class ExtractedAsset {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
     private Long id;
 
     @Column(name = "project_id", nullable = false)

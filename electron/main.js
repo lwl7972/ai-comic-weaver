@@ -15,7 +15,13 @@ autoUpdater.autoInstallOnAppQuit = true
 
 let mainWindow = null
 let jvmProcess = null
-const backendPort = findFreePort()
+let backendPort = 18081
+let backendReady = false
+let backendReadyFired = false
+let startupTimeout = null
+const JVM_STARTUP_TIMEOUT_MS = 60_000  // 60s 启动超时
+const MAX_JVM_RESTART_ATTEMPTS = 3
+let jvmRestartAttempts = 0
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -74,10 +80,21 @@ function startBackend() {
   })
 
   let output = ''
+  backendReady = false
+  backendReadyFired = false
+
   jvmProcess.stdout.on('data', (data) => {
-    output += data.toString()
-    // Detect Spring Boot startup completion
-    if (output.includes('Started AiComicPlatformApplication')) {
+    const chunk = data.toString()
+    output += chunk
+    // 限制累积输出长度，避免内存泄漏
+    if (output.length > 50000) {
+      output = output.slice(-20000)
+    }
+    // 检测 Spring Boot 启动完成（仅触发一次）
+    if (!backendReadyFired && output.includes('Started AiComicPlatformApplication')) {
+      backendReady = true
+      backendReadyFired = true
+      clearStartupTimeout()
       console.log('[Electron] Backend started successfully')
       mainWindow?.webContents.send('backend-ready', { port: backendPort })
     }
@@ -90,14 +107,54 @@ function startBackend() {
   jvmProcess.on('exit', (code) => {
     console.log(`[JVM] Process exited with code ${code}`)
     jvmProcess = null
+    clearStartupTimeout()
+    // 通知前端后端已断开
+    if (backendReady) {
+      mainWindow?.webContents.send('backend-error', {
+        message: `后端进程已退出 (code: ${code})`,
+        canRestart: jvmRestartAttempts < MAX_JVM_RESTART_ATTEMPTS,
+      })
+    }
+    // 自动重启（指数退避）
+    if (code !== 0 && jvmRestartAttempts < MAX_JVM_RESTART_ATTEMPTS) {
+      jvmRestartAttempts++
+      const delay = Math.min(5000 * jvmRestartAttempts, 30000)
+      console.log(`[JVM] 将在 ${delay}ms 后重启 (第 ${jvmRestartAttempts} 次重试)...`)
+      setTimeout(() => startBackend(), delay)
+    }
   })
 
   jvmProcess.on('error', (err) => {
     console.error(`[JVM] Failed to start: ${err.message}`)
+    clearStartupTimeout()
+    mainWindow?.webContents.send('backend-error', {
+      message: `后端启动失败: ${err.message}`,
+      canRestart: false,
+    })
   })
+
+  // 启动超时检测
+  startupTimeout = setTimeout(() => {
+    if (!backendReady) {
+      console.error(`[JVM] 启动超时 (${JVM_STARTUP_TIMEOUT_MS}ms)`)
+      mainWindow?.webContents.send('backend-error', {
+        message: '后端启动超时，请检查 Java 环境',
+        canRestart: true,
+      })
+    }
+  }, JVM_STARTUP_TIMEOUT_MS)
+}
+
+function clearStartupTimeout() {
+  if (startupTimeout) {
+    clearTimeout(startupTimeout)
+    startupTimeout = null
+  }
 }
 
 function stopBackend() {
+  clearStartupTimeout()
+  jvmRestartAttempts = MAX_JVM_RESTART_ATTEMPTS  // 阻止自动重启
   if (jvmProcess) {
     jvmProcess.kill()
     jvmProcess = null
@@ -108,38 +165,26 @@ function stopBackend() {
 // 工具函数
 // ============================================================
 
-/** Find a free port for the backend */
-function findFreePort() {
-  return new Promise((resolve) => {
-    const server = net.createServer()
-    server.listen(0, '127.0.0.1', () => {
-      const port = server.address().port
-      server.close(() => resolve(port))
-    })
-  }).sync ? 18081 : (() => {
-    const s = net.createServer()
-    s.listen(0, '127.0.0.1', () => {
-      const p = s.address().port
-      s.close()
-      return p
-    })
-    return 18081
-  })()
-}
-
-// Actually implement properly:
-function getFreePortSync(startPort = 18081) {
-  // Simple approach: use a fixed offset from electron's default or detect
-  return startPort
-}
-
-// Override with async detection
+/** 异步检测空闲端口（含错误处理和超时） */
 async function detectFreePort() {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const srv = net.createServer()
+    const timeout = setTimeout(() => {
+      srv.close()
+      reject(new Error('端口检测超时'))
+    }, 5000)
+
+    srv.on('error', (err) => {
+      clearTimeout(timeout)
+      reject(err)
+    })
+
     srv.listen(0, '127.0.0.1', () => {
       const port = srv.address().port
-      srv.close(() => resolve(port))
+      srv.close(() => {
+        clearTimeout(timeout)
+        resolve(port)
+      })
     })
   })
 }
@@ -188,8 +233,13 @@ function setupAutoUpdater() {
 // ============================================================
 
 app.whenReady().then(async () => {
-  const port = await detectFreePort()
-  global.backendPort = port
+  try {
+    backendPort = await detectFreePort()
+  } catch (err) {
+    console.error('[Electron] 端口检测失败，使用默认端口:', err.message)
+    backendPort = 18081
+  }
+  global.backendPort = backendPort
   createWindow()
   startBackend()
   setupAutoUpdater()
@@ -197,11 +247,15 @@ app.whenReady().then(async () => {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
+}).catch((err) => {
+  console.error('[Electron] App initialization failed:', err)
 })
 
 app.on('window-all-closed', () => {
-  stopBackend()
-  if (process.platform !== 'darwin') app.quit()
+  if (process.platform !== 'darwin') {
+    stopBackend()
+    app.quit()
+  }
 })
 
 app.on('before-quit', () => {

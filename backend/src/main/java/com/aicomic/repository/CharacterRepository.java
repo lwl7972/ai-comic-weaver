@@ -12,4 +12,6 @@ public interface CharacterRepository extends JpaRepository<Character, Long> {
     List<Character> findByProjectIdOrderByNameAsc(Long projectId);
 
     List<Character> findByProjectIdAndConfirmedAtIsNotNull(Long projectId);
+
+    void deleteByProjectId(Long projectId);
 }

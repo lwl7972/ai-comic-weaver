@@ -15,4 +15,6 @@ public interface StoryboardRepository extends JpaRepository<Storyboard, Long> {
     Optional<Storyboard> findByEpisodeIdAndSequence(Long episodeId, Integer sequence);
 
     long countByEpisodeIdAndStatus(Long episodeId, Storyboard.StoryboardStatus status);
+
+    void deleteByEpisodeId(Long episodeId);
 }
