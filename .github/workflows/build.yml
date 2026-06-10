@@ -30,9 +30,10 @@ jobs:
 
       # Rename jar to fixed name (electron expects this)
       - name: Prepare backend jar
+        shell: pwsh
         run: |
-          mkdir -p backend/target
-          copy backend\target\ai-comic-platform-0.1.0.jar backend\target\ai-comic-platform.jar
+          New-Item -ItemType Directory -Force -Path backend\target | Out-Null
+          Copy-Item -Path backend\target\ai-comic-platform-0.1.0.jar -Destination backend\target\ai-comic-platform.jar -Force
 
       # ============================================================
       # Frontend: Node.js + Vite
