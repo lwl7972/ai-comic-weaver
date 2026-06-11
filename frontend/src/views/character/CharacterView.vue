@@ -130,17 +130,24 @@ import { Plus, Loading, User } from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus'
 import { useProjectStore } from '@/stores/project'
 import { useCharacterStore } from '@/stores/character'
-import type { Character } from '@/types'
+import type { Character, CharacterRole, Gender } from '@/types'
 
 const projectStore = useProjectStore()
 const charStore = useCharacterStore()
 
 const showCreateDialog = ref(false)
 const editingChar = ref<Character | null>(null)
-const charForm = ref({
+const charForm = ref<{
+  name: string
+  role: CharacterRole
+  gender: Gender
+  ageRange: string
+  appearance: string
+  personality: string
+}>({
   name: '',
-  role: 'SUPPORTING' as string,
-  gender: 'OTHER' as string,
+  role: 'SUPPORTING',
+  gender: 'OTHER',
   ageRange: '',
   appearance: '',
   personality: '',
