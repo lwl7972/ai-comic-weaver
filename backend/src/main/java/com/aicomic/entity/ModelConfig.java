@@ -4,6 +4,7 @@ import javax.persistence.*;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -47,6 +48,7 @@ public class ModelConfig {
 
     /** API Key (加密存储) */
     @Column(name = "api_key", nullable = false)
+    @ToString.Exclude
     private String apiKey;
 
     /** 模型名称 (如 gpt-4o, claude-3.5-sonnet) */

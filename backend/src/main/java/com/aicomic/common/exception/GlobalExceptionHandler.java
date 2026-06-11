@@ -1,6 +1,7 @@
 package com.aicomic.common.exception;
 
 import com.aicomic.common.response.ApiResponse;
+import com.aicomic.service.model.ModelCallException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -41,6 +42,14 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.NOT_FOUND)
                 .body(ApiResponse.error(ApiResponse.NOT_FOUND, e.getMessage()));
+    }
+
+    @ExceptionHandler(ModelCallException.class)
+    public ResponseEntity<ApiResponse<?>> handleModelCallException(ModelCallException e) {
+        log.warn("模型调用失败: {}", e.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.BAD_GATEWAY)
+                .body(ApiResponse.error(ApiResponse.TASK_FAILED, e.getMessage()));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

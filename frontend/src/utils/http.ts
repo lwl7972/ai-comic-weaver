@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { AxiosInstance } from 'axios'
+import type { AxiosInstance, AxiosError } from 'axios'
 import { ElMessage } from 'element-plus'
 
 /**
@@ -29,6 +29,37 @@ http.interceptors.request.use(async (config) => {
   return Promise.reject(error)
 })
 
+/**
+ * 根据 HTTP 状态码和后端 code 差异化错误消息
+ */
+function classifyError(error: AxiosError): string {
+  const status = error.response?.status
+  const data: any = error.response?.data
+
+  if (status === 404) {
+    return data?.message || '请求的资源不存在'
+  }
+  if (status === 400) {
+    return data?.message || '请求参数错误'
+  }
+  if (status === 401 || status === 403) {
+    return '没有权限执行此操作'
+  }
+  if (status === 502 || status === 503) {
+    return 'AI 服务暂不可用，请稍后重试'
+  }
+  if (status && status >= 500) {
+    return data?.message || '服务器内部错误，请稍后重试'
+  }
+  if (error.code === 'ERR_CANCELED') {
+    return '' // 取消的请求不提示
+  }
+  if (!error.response) {
+    return '网络连接失败，请检查网络'
+  }
+  return data?.message || error.message || '请求失败'
+}
+
 // Response interceptor: unwrap unified response format + global error toast
 http.interceptors.response.use(
   (response) => {
@@ -39,13 +70,16 @@ http.interceptors.response.use(
     ElMessage.error(msg)
     return Promise.reject(new Error(msg))
   },
-  (error) => {
-    const msg = error.response?.data?.message || error.message || '网络错误'
-    // Only show toast for non-cancelled requests
-    if (error.code !== 'ERR_CANCELED') {
+  (error: AxiosError) => {
+    const msg = classifyError(error)
+    // Only show toast for non-cancelled requests with a message
+    if (msg) {
       ElMessage.error(msg)
     }
-    return Promise.reject(new Error(msg))
+    const enrichedError = new Error(msg) as Error & { status?: number; code?: string }
+    enrichedError.status = error.response?.status
+    enrichedError.code = error.code || undefined
+    return Promise.reject(enrichedError)
   },
 )
 
