@@ -104,9 +104,11 @@ const pipelineActiveStep = computed(() => {
   return stepMap[route.path] ?? -1
 })
 
+let offNotification: (() => void) | null = null
+
 onMounted(() => {
   // 连接 SSE 实时推送
-  sseClient.on('notification', (data: any) => {
+  offNotification = sseClient.on('notification', (data: any) => {
     const store = useNotificationStore()
     switch (data.type) {
       case 'success': store.success(data.message); break
@@ -119,7 +121,11 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  // 路由组件销毁时断开 SSE 连接，避免内存泄漏
+  // 路由组件销毁时断开 SSE 连接，移除事件监听器，避免内存泄漏
+  if (offNotification) {
+    offNotification()
+    offNotification = null
+  }
   sseClient.disconnect()
   notificationStore.cleanup()
 })

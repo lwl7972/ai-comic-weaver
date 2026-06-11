@@ -1,18 +1,18 @@
 package com.aicomic.controller;
 
+import com.aicomic.common.exception.ResourceNotFoundException;
 import com.aicomic.common.response.ApiResponse;
-import com.aicomic.entity.Episode;
+import com.aicomic.dto.ProjectRequest;
 import com.aicomic.entity.PipelineState;
 import com.aicomic.entity.Project;
-import com.aicomic.entity.Storyboard;
 import com.aicomic.repository.*;
+import com.aicomic.service.ProjectService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * 项目管理 REST API - 对应 6.4.3 项目管理端点
@@ -24,18 +24,16 @@ public class ProjectController {
 
     private final ProjectRepository projectRepository;
     private final PipelineStateRepository pipelineStateRepository;
-    private final ScriptRepository scriptRepository;
-    private final NovelRepository novelRepository;
-    private final CharacterRepository characterRepository;
-    private final SceneRepository sceneRepository;
-    private final EpisodeRepository episodeRepository;
-    private final StoryboardRepository storyboardRepository;
-    private final GenerationTaskRepository generationTaskRepository;
+    private final ProjectService projectService;
 
     /** POST /api/v1/projects - 创建项目（事务保证项目与流水线状态原子写入） */
     @PostMapping
     @Transactional
-    public ApiResponse<Project> create(@RequestBody Project project) {
+    public ApiResponse<Project> create(@RequestBody ProjectRequest req) {
+        Project project = new Project();
+        project.setName(req.getName());
+        project.setDescription(req.getDescription());
+        project.setStyle(req.getStyle());
         Project saved = projectRepository.save(project);
 
         PipelineState state = new PipelineState();
@@ -62,12 +60,12 @@ public class ProjectController {
 
     /** PUT /api/v1/projects/{id} - 更新项目 */
     @PutMapping("/{id}")
-    public ApiResponse<Project> update(@PathVariable Long id, @RequestBody Project updated) {
+    public ApiResponse<Project> update(@PathVariable Long id, @RequestBody ProjectRequest req) {
         return projectRepository.findById(id)
                 .map(project -> {
-                    if (updated.getName() != null) project.setName(updated.getName());
-                    if (updated.getDescription() != null) project.setDescription(updated.getDescription());
-                    if (updated.getStyle() != null) project.setStyle(updated.getStyle());
+                    if (req.getName() != null) project.setName(req.getName());
+                    if (req.getDescription() != null) project.setDescription(req.getDescription());
+                    if (req.getStyle() != null) project.setStyle(req.getStyle());
                     return ApiResponse.success(projectRepository.save(project));
                 })
                 .orElseGet(() -> ApiResponse.error(ApiResponse.NOT_FOUND, "项目不存在"));
@@ -75,56 +73,13 @@ public class ProjectController {
 
     /** DELETE /api/v1/projects/{id} - 删除项目（级联删除所有关联数据） */
     @DeleteMapping("/{id}")
-    @Transactional
     public ApiResponse<Void> delete(@PathVariable Long id) {
-        if (!projectRepository.existsById(id)) {
+        try {
+            projectService.deleteProject(id);
+            return ApiResponse.success();
+        } catch (ResourceNotFoundException e) {
             return ApiResponse.error(ApiResponse.NOT_FOUND, "项目不存在");
         }
-
-        // 1. 先收集关联 ID（用于清理生成任务）
-        List<Long> charIds = characterRepository.findByProjectIdOrderByNameAsc(id)
-                .stream().map(c -> c.getId()).collect(Collectors.toList());
-        List<Long> sceneIds = sceneRepository.findByProjectIdOrderByNameAsc(id)
-                .stream().map(s -> s.getId()).collect(Collectors.toList());
-
-        // 2. 删除剧本 → 剧集 → 分镜 级联
-        List<Long> scriptIds = scriptRepository.findByProjectIdOrderByCreatedAtDesc(id)
-                .stream().map(s -> s.getId()).collect(Collectors.toList());
-        List<Long> allEpisodeIds = scriptIds.stream()
-                .flatMap(sid -> episodeRepository.findByScriptIdOrderByEpisodeNumberAsc(sid).stream())
-                .map(Episode::getId).collect(Collectors.toList());
-        List<Long> storyboardIds = allEpisodeIds.stream()
-                .flatMap(eid -> storyboardRepository.findByEpisodeIdOrderBySequenceAsc(eid).stream())
-                .map(sb -> sb.getId()).collect(Collectors.toList());
-
-        // 3. 按依赖顺序删除：分镜 → 剧集 → 生成任务 → 角色/场景/小说/剧本 → 流水线 → 项目
-        for (Long eid : allEpisodeIds) {
-            storyboardRepository.deleteByEpisodeId(eid);
-        }
-        if (!storyboardIds.isEmpty()) {
-            generationTaskRepository.deleteByTargetTypeAndTargetIdIn("STORYBOARD", storyboardIds);
-        }
-        if (!allEpisodeIds.isEmpty()) {
-            episodeRepository.deleteAllById(allEpisodeIds);
-        }
-        if (!charIds.isEmpty()) {
-            generationTaskRepository.deleteByTargetTypeAndTargetIdIn("CHARACTER", charIds);
-            generationTaskRepository.deleteByTargetTypeAndTargetIdIn("CHARACTER_ANCHOR", charIds);
-        }
-        if (!sceneIds.isEmpty()) {
-            generationTaskRepository.deleteByTargetTypeAndTargetIdIn("SCENE", sceneIds);
-        }
-        characterRepository.deleteByProjectId(id);
-        sceneRepository.deleteByProjectId(id);
-        novelRepository.deleteByProjectId(id);
-        scriptRepository.deleteByProjectId(id);
-
-        // 4. 删除流水线状态
-        pipelineStateRepository.findByProjectId(id).ifPresent(pipelineStateRepository::delete);
-
-        // 5. 最后删除项目本身
-        projectRepository.deleteById(id);
-        return ApiResponse.success();
     }
 
     /** GET /api/v1/projects/{id}/pipeline-state - 流水线状态 */
@@ -152,6 +107,15 @@ public class ProjectController {
 
         return pipelineStateRepository.findByProjectId(projectId)
                 .map(state -> {
+                    // 校验阶段推进合法性：只允许推进到下一阶段或停留在当前阶段
+                    Project.PipelineStage[] stages = Project.PipelineStage.values();
+                    int currentIdx = state.getCurrentStage().ordinal();
+                    int targetIdx = targetStage.ordinal();
+                    if (targetIdx > currentIdx + 1) {
+                        return ApiResponse.<PipelineState>error(ApiResponse.PARAM_ERROR,
+                                "不能从 " + state.getCurrentStage() + " 跳跃到 " + targetStage + "，请按顺序推进");
+                    }
+
                     state.setCurrentStage(targetStage);
                     // Reset dirty flag for this stage
                     switch (targetStage) {

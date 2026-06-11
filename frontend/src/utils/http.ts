@@ -17,12 +17,17 @@ const http: AxiosInstance = axios.create({
   },
 })
 
+// Cached backend port for Electron mode
+let cachedBackendPort: string | null = null
+
 // Request interceptor: attach backend port in Electron mode
 http.interceptors.request.use(async (config) => {
   // In Electron, redirect API calls to the dynamic JVM port
   if ((window as any).electronAPI?.getBackendPort) {
-    const port = await (window as any).electronAPI.getBackendPort()
-    config.baseURL = `http://localhost:${port}/api`
+    if (!cachedBackendPort) {
+      cachedBackendPort = await (window as any).electronAPI.getBackendPort()
+    }
+    config.baseURL = `http://localhost:${cachedBackendPort}/api`
   }
   return config
 }, (error) => {
@@ -65,15 +70,16 @@ http.interceptors.response.use(
   (response) => {
     const { code, message, data } = response.data
     if (code === 0) return { ...response, data }
-    // Business error: show toast and reject
+    // Business error: reject without toast — let Store decide how to display
     const msg = message || '请求失败'
-    ElMessage.error(msg)
     return Promise.reject(new Error(msg))
   },
   (error: AxiosError) => {
     const msg = classifyError(error)
     // Only show toast for non-cancelled requests with a message
-    if (msg) {
+    // Store-level handlers will also show notifications, so we keep this
+    // as a fallback for unhandled cases (e.g. 401/403/502)
+    if (msg && (error.response?.status === 401 || error.response?.status === 403 || error.response?.status === 502 || error.response?.status === 503)) {
       ElMessage.error(msg)
     }
     const enrichedError = new Error(msg) as Error & { status?: number; code?: string }

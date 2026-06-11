@@ -2,6 +2,7 @@ package com.aicomic.controller;
 
 import com.aicomic.common.exception.ResourceNotFoundException;
 import com.aicomic.common.response.ApiResponse;
+import com.aicomic.dto.PromptTemplateRequest;
 import com.aicomic.entity.PromptTemplate;
 import com.aicomic.service.PromptTemplateService;
 import lombok.RequiredArgsConstructor;
@@ -48,14 +49,27 @@ public class PromptTemplateController {
 
     /** POST /api/v1/prompt-templates - 创建模板 */
     @PostMapping
-    public ApiResponse<PromptTemplate> create(@RequestBody PromptTemplate template) {
+    public ApiResponse<PromptTemplate> create(@RequestBody PromptTemplateRequest req) {
+        PromptTemplate template = new PromptTemplate();
+        applyRequestToTemplate(template, req);
         return ApiResponse.success(promptTemplateService.createTemplate(template));
     }
 
     /** PUT /api/v1/prompt-templates/{id} - 更新模板（版本号自动递增） */
     @PutMapping("/{id}")
-    public ApiResponse<PromptTemplate> update(@PathVariable Long id, @RequestBody PromptTemplate template) {
+    public ApiResponse<PromptTemplate> update(@PathVariable Long id, @RequestBody PromptTemplateRequest req) {
+        PromptTemplate template = promptTemplateService.getTemplate(id)
+                .orElseGet(PromptTemplate::new);
+        applyRequestToTemplate(template, req);
         return ApiResponse.success(promptTemplateService.updateTemplate(id, template));
+    }
+
+    private void applyRequestToTemplate(PromptTemplate template, PromptTemplateRequest req) {
+        if (req.getName() != null) template.setName(req.getName());
+        if (req.getCategory() != null) template.setCategory(req.getCategory());
+        if (req.getContent() != null) template.setContent(req.getContent());
+        if (req.getVariables() != null) template.setVariables(req.getVariables());
+        if (req.getIsDefault() != null) template.setIsDefault(req.getIsDefault());
     }
 
     /** DELETE /api/v1/prompt-templates/{id} - 删除模板 */
