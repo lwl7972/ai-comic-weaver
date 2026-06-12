@@ -51,6 +51,13 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/project/ProjectView.vue'),
         meta: { title: '项目管理', icon: 'FolderOpened' },
       },
+      // 素材库
+      {
+        path: '/asset',
+        name: 'Asset',
+        component: () => import('@/views/asset/AssetView.vue'),
+        meta: { title: '素材库', icon: 'Folder' },
+      },
       // 配置中心
       {
         path: '/config',

@@ -69,6 +69,10 @@
             <span v-if="pipelineStore.isOutputDirty" class="dirty-dot" />
           </el-menu-item>
           <el-divider border-style="dashed" />
+          <el-menu-item index="/asset">
+            <el-icon><Folder /></el-icon>
+            <span>素材库</span>
+          </el-menu-item>
           <el-menu-item index="/config">
             <el-icon><Setting /></el-icon>
             <span>配置中心</span>
@@ -99,7 +103,7 @@ import { useProjectStore } from '@/stores/project'
 import type { PipelineStage } from '@/types'
 import {
   Document, UserFilled, PictureFilled, Film,
-  VideoCamera, Star, FolderOpened, Setting,
+  VideoCamera, Star, FolderOpened, Setting, Folder,
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
