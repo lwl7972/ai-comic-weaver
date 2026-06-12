@@ -5,6 +5,7 @@ import com.aicomic.dto.StoryboardRequest;
 import com.aicomic.entity.Character;
 import com.aicomic.entity.Episode;
 import com.aicomic.entity.ModelConfig;
+import com.aicomic.entity.Project;
 import com.aicomic.entity.Scene;
 import com.aicomic.entity.Storyboard;
 import com.aicomic.repository.CharacterRepository;
@@ -42,6 +43,7 @@ public class StoryboardService {
     private final ReferenceResolutionService refService;
     private final SseService sseService;
     private final ObjectMapper objectMapper;
+    private final PipelineStateService pipelineStateService;
 
     // ==================== Basic CRUD ====================
 
@@ -58,12 +60,24 @@ public class StoryboardService {
 
     @Transactional
     public Storyboard saveStoryboard(Storyboard storyboard) {
-        return storyboardRepository.save(storyboard);
+        Storyboard saved = storyboardRepository.save(storyboard);
+        Long projectId = refService.resolveProjectIdFromStoryboard(saved);
+        if (projectId != null) {
+            pipelineStateService.markDirty(projectId, Project.PipelineStage.STORYBOARD);
+        }
+        return saved;
     }
 
     @Transactional
     public List<Storyboard> saveStoryboards(List<Storyboard> storyboards) {
-        return storyboardRepository.saveAll(storyboards);
+        List<Storyboard> saved = storyboardRepository.saveAll(storyboards);
+        if (!saved.isEmpty()) {
+            Long projectId = refService.resolveProjectIdFromStoryboard(saved.get(0));
+            if (projectId != null) {
+                pipelineStateService.markDirty(projectId, Project.PipelineStage.STORYBOARD);
+            }
+        }
+        return saved;
     }
 
     @Transactional
@@ -71,7 +85,12 @@ public class StoryboardService {
         if (!storyboardRepository.existsById(storyboardId)) {
             throw new ResourceNotFoundException("分镜", storyboardId);
         }
+        Storyboard sb = storyboardRepository.findById(storyboardId).orElse(null);
+        Long projectId = sb != null ? refService.resolveProjectIdFromStoryboard(sb) : null;
         storyboardRepository.deleteById(storyboardId);
+        if (projectId != null) {
+            pipelineStateService.markDirty(projectId, Project.PipelineStage.STORYBOARD);
+        }
     }
 
     // ==================== 三步流程 Step 1: AI Parse (ADR-19) ====================
@@ -108,6 +127,12 @@ public class StoryboardService {
             storyboardRepository.deleteByEpisodeId(episodeId);
             storyboardRepository.saveAll(storyboards);
 
+            // Mark storyboard dirty
+            Long projectId = refService.resolveProjectIdFromStoryboard(storyboards.get(0));
+            if (projectId != null) {
+                pipelineStateService.markDirty(projectId, Project.PipelineStage.STORYBOARD);
+            }
+
             // Mark episode as parsed
             episode.setStatus(Episode.EpisodeStatus.PARSED);
             episodeRepository.save(episode);
@@ -143,6 +168,12 @@ public class StoryboardService {
             }
             applyRequestToStoryboard(req, sb);
             updated.add(storyboardRepository.save(sb));
+        }
+        if (!updated.isEmpty()) {
+            Long projectId = refService.resolveProjectIdFromStoryboard(updated.get(0));
+            if (projectId != null) {
+                pipelineStateService.markDirty(projectId, Project.PipelineStage.STORYBOARD);
+            }
         }
         return updated;
     }
@@ -200,6 +231,14 @@ public class StoryboardService {
                     String.format("分镜图生成完成: %d成功, %d失败", success, failed));
             log.info("分镜图批量生成完成: episodeId={}, 成功={}, 失败={}", episodeId, success, failed);
 
+            // Mark storyboard dirty using first storyboard's projectId
+            if (!storyboards.isEmpty()) {
+                Long projectId = refService.resolveProjectIdFromStoryboard(storyboards.get(0));
+                if (projectId != null) {
+                    pipelineStateService.markDirty(projectId, Project.PipelineStage.STORYBOARD);
+                }
+            }
+
         } catch (Exception e) {
             log.error("分镜图批量生成异常: {}", e.getMessage(), e);
             sseService.pushNotification("storyboard-error", "分镜图生成异常: " + e.getMessage());
@@ -231,6 +270,8 @@ public class StoryboardService {
             sb.setGeneratedImageUrl(imageUrl);
             sb.setStatus(Storyboard.StoryboardStatus.IMAGE_DONE);
             storyboardRepository.save(sb);
+
+            pipelineStateService.markDirty(projectId, Project.PipelineStage.STORYBOARD);
 
             sseService.pushNotification("storyboard-completed",
                     String.format("分镜 #%d 图片重新生成完成", sb.getSequence() + 1));
@@ -521,6 +562,10 @@ public class StoryboardService {
             log.warn("解析引用异常: {}", e.getMessage());
         }
 
-        return storyboardRepository.save(sb);
+        Storyboard saved = storyboardRepository.save(sb);
+        if (projectId != null) {
+            pipelineStateService.markDirty(projectId, Project.PipelineStage.STORYBOARD);
+        }
+        return saved;
     }
 }

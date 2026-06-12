@@ -1,8 +1,10 @@
 package com.aicomic.service;
 
+import com.aicomic.common.util.FFmpegUtils;
 import com.aicomic.common.exception.ResourceNotFoundException;
 import com.aicomic.entity.Character;
 import com.aicomic.entity.Episode;
+import com.aicomic.entity.Project;
 import com.aicomic.entity.Scene;
 import com.aicomic.entity.Storyboard;
 import com.aicomic.repository.StoryboardRepository;
@@ -14,6 +16,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 /**
@@ -33,6 +37,8 @@ public class DirectorService {
     private final ModelCallService modelCallService;
     private final ReferenceResolutionService refService;
     private final SseService sseService;
+    private final PipelineStateService pipelineStateService;
+    private final FFmpegUtils ffmpegUtils;
 
     /**
      * 生成整集视频（异步执行）
@@ -103,6 +109,8 @@ public class DirectorService {
             sb.setStatus(Storyboard.StoryboardStatus.VIDEO_DONE);
             storyboardRepository.save(sb);
 
+            pipelineStateService.markDirty(projectId, Project.PipelineStage.DIRECTOR);
+
             sseService.pushNotification("director-progress",
                     String.format("分镜 #%d 视频生成完成", sb.getSequence() + 1));
             log.info("单镜头视频生成完成: storyboardId={}", storyboardId);
@@ -128,15 +136,17 @@ public class DirectorService {
         log.info("开始 FFmpeg 拼接: fragmentCount={}", fragmentUrls.size());
         sseService.pushNotification("director-progress",
                 String.format("正在用 FFmpeg 拼接 %d 个视频片段...", fragmentUrls.size()));
-
-        // TODO: 实现 FFmpeg concat
-        // 1. 下载所有视频片段到临时目录
-        // 2. 生成 concat 文件列表 (file 'xxx.mp4')
-        // 3. 执行 ffmpeg -f concat -safe 0 -i list.txt -c copy output.mp4
-        // 4. 返回合成后视频 URL
-
-        log.info("FFmpeg 拼接完成");
-        return null;
+        try {
+            Path workDir = Files.createTempDirectory("ffmpeg_concat_");
+            String outputPath = workDir + "/concat_result.mp4";
+            ffmpegUtils.concatVideos(fragmentUrls, outputPath);
+            log.info("FFmpeg 拼接完成: {}", outputPath);
+            return outputPath;
+        } catch (Exception e) {
+            log.error("FFmpeg 拼接失败: {}", e.getMessage(), e);
+            sseService.pushNotification("director-error", "FFmpeg拼接失败: " + e.getMessage());
+            return null;
+        }
     }
 
     /**
@@ -215,6 +225,13 @@ public class DirectorService {
                     sb.setStatus(Storyboard.StoryboardStatus.VIDEO_DONE);
                 }
                 storyboardRepository.saveAll(storyboards);
+
+                // Mark director dirty
+                Long projectId = refService.resolveProjectIdFromStoryboard(storyboards.get(0));
+                if (projectId != null) {
+                    pipelineStateService.markDirty(projectId, Project.PipelineStage.DIRECTOR);
+                }
+
                 return true;
             }
         } catch (ModelCallException e) {
@@ -256,6 +273,8 @@ public class DirectorService {
             sb.setGeneratedVideoUrl(videoUrl);
             sb.setStatus(Storyboard.StoryboardStatus.VIDEO_DONE);
             storyboardRepository.save(sb);
+
+            pipelineStateService.markDirty(projectId, Project.PipelineStage.DIRECTOR);
 
             sseService.pushNotification("director-progress",
                     String.format("分镜 #%d 视频生成完成", sb.getSequence() + 1));

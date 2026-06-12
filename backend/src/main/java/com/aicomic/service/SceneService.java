@@ -4,6 +4,7 @@ import com.aicomic.common.exception.ResourceNotFoundException;
 import com.aicomic.entity.Episode;
 import com.aicomic.entity.ExtractedAsset;
 import com.aicomic.entity.ModelConfig;
+import com.aicomic.entity.Project;
 import com.aicomic.entity.Scene;
 import com.aicomic.entity.Script;
 import com.aicomic.repository.EpisodeRepository;
@@ -39,6 +40,7 @@ public class SceneService {
     private final ModelCallService modelCallService;
     private final SseService sseService;
     private final ObjectMapper objectMapper;
+    private final PipelineStateService pipelineStateService;
 
     // ==================== Basic CRUD ====================
 
@@ -55,7 +57,11 @@ public class SceneService {
 
     @Transactional
     public Scene saveScene(Scene scene) {
-        return sceneRepository.save(scene);
+        Scene saved = sceneRepository.save(scene);
+        if (saved.getProjectId() != null) {
+            pipelineStateService.markDirty(saved.getProjectId(), Project.PipelineStage.SCENE);
+        }
+        return saved;
     }
 
     @Transactional
@@ -63,7 +69,12 @@ public class SceneService {
         if (!sceneRepository.existsById(sceneId)) {
             throw new ResourceNotFoundException("场景", sceneId);
         }
+        Scene scene = sceneRepository.findById(sceneId).orElse(null);
+        Long projectId = scene != null ? scene.getProjectId() : null;
         sceneRepository.deleteById(sceneId);
+        if (projectId != null) {
+            pipelineStateService.markDirty(projectId, Project.PipelineStage.SCENE);
+        }
     }
 
     // ==================== AI Scene Extraction (ADR-4) ====================
@@ -98,6 +109,8 @@ public class SceneService {
             for (ExtractedAsset asset : assets) {
                 extractedAssetRepository.save(asset);
             }
+
+            pipelineStateService.markDirty(projectId, Project.PipelineStage.SCENE);
 
             sseService.pushNotification("scene-completed",
                     "场景提取完成: " + assets.size() + " 个场景待确认");
@@ -148,6 +161,8 @@ public class SceneService {
             scene.setRightViewUrl(results[3]);
             sceneRepository.save(scene);
 
+            pipelineStateService.markDirty(scene.getProjectId(), Project.PipelineStage.SCENE);
+
             sseService.pushNotification("scene-completed",
                     String.format("场景 '%s' 四视图生成完成", scene.getName()));
             log.info("场景四视图生成完成: sceneId={}", sceneId);
@@ -195,6 +210,8 @@ public class SceneService {
                     return;
             }
             sceneRepository.save(scene);
+
+            pipelineStateService.markDirty(scene.getProjectId(), Project.PipelineStage.SCENE);
 
             sseService.pushNotification("scene-completed",
                     String.format("场景 '%s' 的%s视图重新生成完成", scene.getName(), getViewLabel(viewType)));
@@ -246,6 +263,8 @@ public class SceneService {
 
         asset.setConfirmedRefId(scene.getId());
         extractedAssetRepository.save(asset);
+
+        pipelineStateService.markDirty(scene.getProjectId(), Project.PipelineStage.SCENE);
 
         return scene;
     }

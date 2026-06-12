@@ -1,6 +1,5 @@
 package com.aicomic.controller;
 
-import com.aicomic.common.exception.ResourceNotFoundException;
 import com.aicomic.common.response.ApiResponse;
 import com.aicomic.dto.PromptTemplateRequest;
 import com.aicomic.entity.PromptTemplate;
@@ -86,12 +85,10 @@ public class PromptTemplateController {
         return ApiResponse.success(rendered);
     }
 
-    /** POST /api/v1/prompt-templates/{id}/validate - 校验变量 */
+    /** POST /api/v1/prompt-templates/{id}/validate - 校验模板变量完整性 */
     @PostMapping("/{id}/validate")
-    public ApiResponse<List<String>> validate(@PathVariable Long id, @RequestBody Map<String, String> variables) {
-        PromptTemplate template = promptTemplateService.getTemplate(id)
-                .orElseThrow(() -> new ResourceNotFoundException("提示词模板", id));
-        List<String> missing = promptTemplateService.validateVariables(template.getContent(), variables);
-        return ApiResponse.success(missing);
+    public ApiResponse<Map<String, Object>> validate(@PathVariable Long id) {
+        Map<String, Object> result = promptTemplateService.validateTemplate(id);
+        return ApiResponse.success(result);
     }
 }

@@ -3,15 +3,14 @@ package com.aicomic.service;
 import com.aicomic.common.exception.ResourceNotFoundException;
 import com.aicomic.entity.PromptTemplate;
 import com.aicomic.repository.PromptTemplateRepository;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -26,6 +25,7 @@ import java.util.stream.Collectors;
 public class PromptTemplateService {
 
     private final PromptTemplateRepository promptTemplateRepository;
+    private final ObjectMapper objectMapper;
 
     /** 占位符正则: {variableName} */
     private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\{(\\w+)}");
@@ -105,7 +105,19 @@ public class PromptTemplateService {
         PromptTemplate template = promptTemplateRepository.findById(templateId)
                 .orElseThrow(() -> new ResourceNotFoundException("提示词模板", templateId));
 
-        return renderContent(template.getContent(), variables);
+        // 解析 content 中的所有变量引用
+        Set<String> requiredVars = parseContentVariables(template.getContent());
+
+        // 校验必需变量都已提供
+        Map<String, String> safeVariables = variables != null ? variables : new HashMap<>();
+        List<String> missing = requiredVars.stream()
+                .filter(var -> !safeVariables.containsKey(var))
+                .collect(Collectors.toList());
+        if (!missing.isEmpty()) {
+            throw new IllegalArgumentException("缺少必需变量: " + String.join(", ", missing));
+        }
+
+        return renderContent(template.getContent(), safeVariables);
     }
 
     /**
@@ -152,5 +164,84 @@ public class PromptTemplateService {
         return requiredVars.stream()
                 .filter(var -> !variables.containsKey(var))
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 校验模板变量定义完整性
+     * 对比 content 中的变量引用与 variables JSON 字段中定义的变量名，
+     * 找出缺失定义和未使用的定义
+     *
+     * @param templateId 模板 ID
+     * @return 校验结果 Map: { valid, contentVariables, definedVariables, missingDefinitions, unusedDefinitions }
+     */
+    public Map<String, Object> validateTemplate(Long templateId) {
+        PromptTemplate template = promptTemplateRepository.findById(templateId)
+                .orElseThrow(() -> new ResourceNotFoundException("提示词模板", templateId));
+
+        // 从 content 中解析变量引用
+        Set<String> contentVariables = parseContentVariables(template.getContent());
+
+        // 从 variables JSON 字段中解析已定义的变量名
+        Set<String> definedVariables = parseDefinedVariables(template.getVariables());
+
+        // content 中有但定义中没有 → missingDefinitions
+        List<String> missingDefinitions = contentVariables.stream()
+                .filter(var -> !definedVariables.contains(var))
+                .sorted()
+                .collect(Collectors.toList());
+
+        // 定义中有但 content 中没有 → unusedDefinitions
+        List<String> unusedDefinitions = definedVariables.stream()
+                .filter(var -> !contentVariables.contains(var))
+                .sorted()
+                .collect(Collectors.toList());
+
+        boolean valid = missingDefinitions.isEmpty() && unusedDefinitions.isEmpty();
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("valid", valid);
+        result.put("contentVariables", new ArrayList<>(contentVariables));
+        result.put("definedVariables", new ArrayList<>(definedVariables));
+        result.put("missingDefinitions", missingDefinitions);
+        result.put("unusedDefinitions", unusedDefinitions);
+        return result;
+    }
+
+    /**
+     * 从模板 content 中解析所有变量引用
+     *
+     * @param content 模板内容
+     * @return 变量名集合
+     */
+    private Set<String> parseContentVariables(String content) {
+        Set<String> variables = new LinkedHashSet<>();
+        if (content == null || content.isEmpty()) {
+            return variables;
+        }
+        Matcher matcher = PLACEHOLDER_PATTERN.matcher(content);
+        while (matcher.find()) {
+            variables.add(matcher.group(1));
+        }
+        return variables;
+    }
+
+    /**
+     * 从 variables JSON 字段中解析已定义的变量名
+     * variables 格式为 JSON 数组，如 ["scriptContent","characterList"]
+     *
+     * @param variablesJson variables JSON 字符串
+     * @return 变量名集合
+     */
+    private Set<String> parseDefinedVariables(String variablesJson) {
+        if (variablesJson == null || variablesJson.isEmpty()) {
+            return new LinkedHashSet<>();
+        }
+        try {
+            List<String> list = objectMapper.readValue(variablesJson, new TypeReference<List<String>>() {});
+            return new LinkedHashSet<>(list);
+        } catch (Exception e) {
+            log.warn("解析模板变量定义失败: {}", e.getMessage());
+            return new LinkedHashSet<>();
+        }
     }
 }

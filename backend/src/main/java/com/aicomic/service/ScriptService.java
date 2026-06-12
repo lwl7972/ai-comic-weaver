@@ -30,6 +30,7 @@ public class ScriptService {
     private final PromptTemplateService promptTemplateService;
     private final ModelCallService modelCallService;
     private final SseService sseService;
+    private final PipelineStateService pipelineStateService;
 
     // ==================== Basic CRUD ====================
 
@@ -45,7 +46,9 @@ public class ScriptService {
 
     @Transactional
     public Script saveScript(Script script) {
-        return scriptRepository.save(script);
+        Script saved = scriptRepository.save(script);
+        pipelineStateService.markDirty(saved.getProjectId(), Project.PipelineStage.SCRIPT);
+        return saved;
     }
 
     @Transactional
@@ -53,9 +56,14 @@ public class ScriptService {
         if (!scriptRepository.existsById(id)) {
             throw new ResourceNotFoundException("Script", id);
         }
+        Script script = scriptRepository.findById(id).orElse(null);
+        Long projectId = script != null ? script.getProjectId() : null;
         List<Episode> episodes = episodeRepository.findByScriptIdOrderByEpisodeNumberAsc(id);
         episodeRepository.deleteAll(episodes);
         scriptRepository.deleteById(id);
+        if (projectId != null) {
+            pipelineStateService.markDirty(projectId, Project.PipelineStage.SCRIPT);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -70,7 +78,12 @@ public class ScriptService {
 
     @Transactional
     public Episode saveEpisode(Episode episode) {
-        return episodeRepository.save(episode);
+        Episode saved = episodeRepository.save(episode);
+        if (saved.getScriptId() != null) {
+            scriptRepository.findById(saved.getScriptId()).ifPresent(s ->
+                    pipelineStateService.markDirty(s.getProjectId(), Project.PipelineStage.SCRIPT));
+        }
+        return saved;
     }
 
     // ==================== AI Outline Generation ====================
@@ -106,6 +119,7 @@ public class ScriptService {
             }
 
             scriptRepository.save(script);
+            pipelineStateService.markDirty(projectId, Project.PipelineStage.SCRIPT);
             sseService.pushNotification("script-completed",
                     "Outline generated: " + episodeOutlines.size() + " episodes");
             log.info("Outline generated: scriptId={}, episodes={}", scriptId, episodeOutlines.size());
@@ -144,6 +158,8 @@ public class ScriptService {
             episode.setScriptContent(scriptContent);
             episode.setStatus(Episode.EpisodeStatus.READY);
             episodeRepository.save(episode);
+
+            pipelineStateService.markDirty(script.getProjectId(), Project.PipelineStage.SCRIPT);
 
             sseService.pushNotification("script-progress",
                     String.format("Episode %d script generated", episode.getEpisodeNumber()));

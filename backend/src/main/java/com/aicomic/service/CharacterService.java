@@ -3,6 +3,7 @@ package com.aicomic.service;
 import com.aicomic.common.exception.ResourceNotFoundException;
 import com.aicomic.entity.Character;
 import com.aicomic.entity.ExtractedAsset;
+import com.aicomic.entity.Project;
 import com.aicomic.entity.Script;
 import com.aicomic.entity.Episode;
 import com.aicomic.entity.ModelConfig;
@@ -40,6 +41,7 @@ public class CharacterService {
     private final ModelCallService modelCallService;
     private final SseService sseService;
     private final ObjectMapper objectMapper;
+    private final PipelineStateService pipelineStateService;
 
     // ==================== Basic CRUD ====================
 
@@ -55,7 +57,11 @@ public class CharacterService {
 
     @Transactional
     public Character saveCharacter(Character character) {
-        return characterRepository.save(character);
+        Character saved = characterRepository.save(character);
+        if (saved.getProjectId() != null) {
+            pipelineStateService.markDirty(saved.getProjectId(), Project.PipelineStage.CHARACTER);
+        }
+        return saved;
     }
 
     @Transactional
@@ -63,7 +69,12 @@ public class CharacterService {
         if (!characterRepository.existsById(characterId)) {
             throw new ResourceNotFoundException("Character", characterId);
         }
+        Character character = characterRepository.findById(characterId).orElse(null);
+        Long projectId = character != null ? character.getProjectId() : null;
         characterRepository.deleteById(characterId);
+        if (projectId != null) {
+            pipelineStateService.markDirty(projectId, Project.PipelineStage.CHARACTER);
+        }
     }
 
     // ==================== AI Asset Extraction (ADR-4) ====================
@@ -95,6 +106,8 @@ public class CharacterService {
                 extractedAssetRepository.save(asset);
             }
 
+            pipelineStateService.markDirty(projectId, Project.PipelineStage.CHARACTER);
+
             sseService.pushNotification("character-completed",
                     "Character extraction complete: " + assets.size() + " characters pending confirmation");
             log.info("Character extraction complete: {} characters found", assets.size());
@@ -122,6 +135,8 @@ public class CharacterService {
 
             character.setAnchorPrompt(makeupPrompt);
             characterRepository.save(character);
+
+            pipelineStateService.markDirty(character.getProjectId(), Project.PipelineStage.CHARACTER);
 
             sseService.pushNotification("character-completed",
                     String.format("Makeup image for '%s' generated", character.getName()));
@@ -178,6 +193,8 @@ public class CharacterService {
 
         asset.setConfirmedRefId(character.getId());
         extractedAssetRepository.save(asset);
+
+        pipelineStateService.markDirty(character.getProjectId(), Project.PipelineStage.CHARACTER);
 
         return character;
     }
