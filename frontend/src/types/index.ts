@@ -54,6 +54,21 @@ export interface Project {
 export type StyleType = 'SHORT_DRAMA' | 'COMIC' | 'TRAILER'
 
 // ============================================================
+// 5.x 项目模板表 project_template
+// ============================================================
+
+export interface ProjectTemplate {
+  id?: number
+  name: string
+  description: string
+  style: StyleType | 'CUSTOM'
+  templateData: string
+  isBuiltin: boolean
+  useCount: number
+  updatedAt: string
+}
+
+// ============================================================
 // 5.2 小说表 novel
 // ============================================================
 
