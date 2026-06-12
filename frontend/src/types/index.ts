@@ -373,3 +373,35 @@ export interface VersionHistory {
   createdBy: string
   createdAt: string
 }
+
+// ============================================================
+// S级模块请求类型
+// ============================================================
+
+/** 成片合成请求 */
+export interface CompositeRequest {
+  episodeId: number
+  addSubtitles?: boolean
+  mixAudio?: boolean
+  transitionType?: string      // fade / slideleft / slideup / zoom
+  transitionDuration?: number  // 转场时长(秒)
+}
+
+/** 导出配置 */
+export interface ExportForm {
+  format: string               // mp4 / mov / avi
+  resolution: string           // 720p / 1080p / 2K / 4K
+  bitrate?: number             // kbps
+  fps?: number                 // 帧率
+}
+
+/** 水印配置 */
+export interface WatermarkForm {
+  watermarkType: 'TEXT' | 'IMAGE'
+  watermarkContent?: string
+  imagePath?: string           // 图片水印路径
+  position?: string            // 位置: top-left / top-right / bottom-left / bottom-right / center
+  opacity?: number             // 透明度 0-1
+  fontSize?: number            // 字体大小
+  fontColor?: string           // 字体颜色 (十六进制)
+}
