@@ -30,7 +30,7 @@ public class StoryboardController {
     public ApiResponse<Storyboard> createStoryboard(@PathVariable Long episodeId, @RequestBody StoryboardRequest req) {
         Storyboard sb = new Storyboard();
         sb.setEpisodeId(episodeId);
-        applyRequestToStoryboard(req, sb);
+        storyboardService.applyRequestToStoryboard(req, sb);
         return ApiResponse.success(storyboardService.saveStoryboard(sb));
     }
 
@@ -38,7 +38,7 @@ public class StoryboardController {
     @PutMapping("/storyboards/{id}")
     public ApiResponse<Storyboard> updateStoryboard(@PathVariable Long id, @RequestBody StoryboardRequest req) {
         Storyboard sb = storyboardService.findStoryboardById(id);
-        applyRequestToStoryboard(req, sb);
+        storyboardService.applyRequestToStoryboard(req, sb);
         return ApiResponse.success(storyboardService.saveStoryboard(sb));
     }
 
@@ -82,26 +82,5 @@ public class StoryboardController {
     @PostMapping("/storyboards/{id}/resolve-references")
     public ApiResponse<Storyboard> resolveReferences(@PathVariable Long id) {
         return ApiResponse.success(storyboardService.resolveReferences(id));
-    }
-
-    // ==================== Helper ====================
-
-    private void applyRequestToStoryboard(StoryboardRequest req, Storyboard sb) {
-        if (req.getSequence() != null) sb.setSequence(req.getSequence());
-        if (req.getTimeRange() != null) sb.setTimeRange(req.getTimeRange());
-        if (req.getContinuity() != null) sb.setContinuity(req.getContinuity());
-        if (req.getDialogue() != null) sb.setDialogue(req.getDialogue());
-        if (req.getAction() != null) sb.setAction(req.getAction());
-        if (req.getEmotion() != null) sb.setEmotion(req.getEmotion());
-        if (req.getShotSize() != null) sb.setShotSize(Storyboard.ShotSize.valueOf(req.getShotSize()));
-        if (req.getCameraAngle() != null) sb.setCameraAngle(Storyboard.CameraAngle.valueOf(req.getCameraAngle()));
-        if (req.getCameraMovement() != null) sb.setCameraMovement(Storyboard.CameraMovement.valueOf(req.getCameraMovement()));
-if (req.getInvolvedCharacters() != null) sb.setInvolvedCharacters(req.getInvolvedCharacters());
-    if (req.getInvolvedCharacterIds() != null) sb.setInvolvedCharacterIds(req.getInvolvedCharacterIds());
-    if (req.getInvolvedSceneName() != null) sb.setInvolvedSceneName(req.getInvolvedSceneName());
-    if (req.getInvolvedSceneId() != null) sb.setInvolvedSceneId(req.getInvolvedSceneId());
-    if (req.getReferenceImageUrls() != null) sb.setReferenceImageUrls(req.getReferenceImageUrls());
-    if (req.getBgSound() != null) sb.setBgSound(req.getBgSound());
-        if (req.getGenerationPurpose() != null) sb.setGenerationPurpose(Storyboard.GenerationPurpose.valueOf(req.getGenerationPurpose()));
     }
 }

@@ -284,8 +284,8 @@
             </el-option>
           </el-select>
           <div v-if="selectedSceneId" class="ref-preview">
-            <img v-if="getSceneThumbnail(sceneStore.scenes.find(s => s.id === selectedSceneId)!)"
-                 :src="getSceneThumbnail(sceneStore.scenes.find(s => s.id === selectedSceneId)!)"
+            <img v-if="selectedScene?.frontViewUrl"
+                 :src="selectedScene.frontViewUrl"
                  class="ref-thumb-preview" />
             <span class="preview-label">场景正面图将作为参考传入分镜图/视频生成</span>
           </div>
@@ -303,7 +303,7 @@
 import { ref, onMounted, computed } from 'vue'
 import {
   Cpu, PictureFilled, Loading, Refresh, WarningFilled, Picture,
-  ChatDotRound, Location, Headset, Edit, Delete, User, Landscape, Link,
+  ChatDotRound, Location, Headset, Edit, Delete, User, Link,
 } from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus'
 import { useProjectStore } from '@/stores/project'
@@ -364,6 +364,12 @@ const episodeId = computed(() => projectStore.currentProject?.currentEpisodeId |
 
 const projectId = computed(() => projectStore.currentProject?.id)
 
+// 当前选中场景的安全引用（避免 .find() + ! 的空值风险）
+const selectedScene = computed(() => {
+  if (!selectedSceneId.value) return null
+  return sceneStore.scenes.find(s => s.id === selectedSceneId.value) ?? null
+})
+
 onMounted(async () => {
   if (episodeId.value) {
     await store.fetchStoryboards(episodeId.value)
@@ -400,6 +406,12 @@ function handleEditStoryboard(sb: Storyboard, index: number) {
 async function handleSaveEdit() {
   if (!editForm.value?.id) return
   try {
+    // 检测角色/场景 ID 是否发生变化，决定是否需要重新解析引用
+    const originalCharIds = parseCharacterIds(editForm.value.involvedCharacterIds)
+    const originalSceneId = editForm.value.involvedSceneId ?? null
+    const charIdsChanged = JSON.stringify(selectedCharacterIds.value) !== JSON.stringify(originalCharIds)
+    const sceneIdChanged = selectedSceneId.value !== originalSceneId
+
     // 写入角色ID和场景ID到 editForm
     editForm.value.involvedCharacterIds = JSON.stringify(selectedCharacterIds.value)
     editForm.value.involvedSceneId = selectedSceneId.value ?? undefined
@@ -417,8 +429,10 @@ async function handleSaveEdit() {
       if (scene) editForm.value.involvedSceneName = scene.name
     }
     await store.updateStoryboard(editForm.value.id, editForm.value)
-    // 保存后自动解析引用，收集参考图URL
-    await store.resolveReferences(editForm.value.id)
+    // 仅在角色/场景 ID 实际变化时才触发引用解析（避免无关编辑的冗余请求）
+    if (charIdsChanged || sceneIdChanged) {
+      await store.resolveReferences(editForm.value.id)
+    }
     showEditDialog.value = false
   } catch (err: any) {
     console.error('[StoryboardView] 保存编辑失败:', err.message)

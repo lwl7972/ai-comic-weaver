@@ -2,8 +2,15 @@ package com.aicomic.service;
 
 import com.aicomic.common.exception.ResourceNotFoundException;
 import com.aicomic.dto.StoryboardRequest;
-import com.aicomic.entity.*;
-import com.aicomic.repository.*;
+import com.aicomic.entity.Character;
+import com.aicomic.entity.Episode;
+import com.aicomic.entity.ModelConfig;
+import com.aicomic.entity.Scene;
+import com.aicomic.entity.Storyboard;
+import com.aicomic.repository.CharacterRepository;
+import com.aicomic.repository.SceneRepository;
+import com.aicomic.repository.StoryboardRepository;
+import com.aicomic.repository.EpisodeRepository;
 import com.aicomic.service.model.ModelCallException;
 import com.aicomic.service.model.ModelCallService;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -31,8 +38,8 @@ public class StoryboardService {
     private final EpisodeRepository episodeRepository;
     private final CharacterRepository characterRepository;
     private final SceneRepository sceneRepository;
-    private final ScriptRepository scriptRepository;
     private final ModelCallService modelCallService;
+    private final ReferenceResolutionService refService;
     private final SseService sseService;
     private final ObjectMapper objectMapper;
 
@@ -129,10 +136,8 @@ public class StoryboardService {
         for (StoryboardRequest req : requests) {
             Storyboard sb;
             if (req.getId() != null) {
-                // ID 存在 → 查找已有分镜进行更新
                 sb = findStoryboardById(req.getId());
             } else {
-                // ID 不存在 → 创建新分镜
                 sb = new Storyboard();
                 sb.setEpisodeId(req.getEpisodeId());
             }
@@ -172,8 +177,10 @@ public class StoryboardService {
                     sb.setStatus(Storyboard.StoryboardStatus.IMAGE_GENERATING);
                     storyboardRepository.save(sb);
 
-                    String imagePrompt = buildStoryboardImagePrompt(sb);
-                    List<String> refUrls = collectReferenceImageUrls(sb);
+                    // 预解析 projectId，避免后续多次反查
+                    Long projectId = refService.resolveProjectIdFromStoryboard(sb);
+                    String imagePrompt = buildStoryboardImagePrompt(sb, projectId);
+                    List<String> refUrls = refService.collectReferenceImageUrls(sb, projectId);
                     String referenceImageUrl = refUrls.isEmpty() ? null : refUrls.get(0);
                     String imageUrl = modelCallService.callImage(imagePrompt, referenceImageUrl, null);
 
@@ -215,8 +222,9 @@ public class StoryboardService {
             sb.setStatus(Storyboard.StoryboardStatus.IMAGE_GENERATING);
             storyboardRepository.save(sb);
 
-            String imagePrompt = buildStoryboardImagePrompt(sb);
-            List<String> refUrls = collectReferenceImageUrls(sb);
+            Long projectId = refService.resolveProjectIdFromStoryboard(sb);
+            String imagePrompt = buildStoryboardImagePrompt(sb, projectId);
+            List<String> refUrls = refService.collectReferenceImageUrls(sb, projectId);
             String referenceImageUrl = refUrls.isEmpty() ? null : refUrls.get(0);
             String imageUrl = modelCallService.callImage(imagePrompt, referenceImageUrl, null);
 
@@ -340,7 +348,11 @@ public class StoryboardService {
         return defaultValue;
     }
 
-    private String buildStoryboardImagePrompt(Storyboard sb) {
+    /**
+     * 构建分镜图生成提示词（注入角色锚点描述和场景信息）
+     * 使用预解析的 projectId 避免多次反查数据库
+     */
+    private String buildStoryboardImagePrompt(Storyboard sb, Long projectId) {
         StringBuilder prompt = new StringBuilder();
         prompt.append("Comic manga panel, ");
 
@@ -354,8 +366,8 @@ public class StoryboardService {
             prompt.append(getCameraAngleDescription(sb.getCameraAngle())).append(", ");
         }
 
-        // Inject character references (anchor prompt descriptions)
-        List<Character> characters = resolveInvolvedCharacters(sb);
+        // Inject character references (anchor prompt descriptions) — 使用预解析 projectId
+        List<Character> characters = refService.resolveInvolvedCharacters(sb, projectId);
         for (Character ch : characters) {
             if (ch.getAnchorPrompt() != null && !ch.getAnchorPrompt().isEmpty()) {
                 prompt.append("character [").append(ch.getName()).append("]: ").append(ch.getAnchorPrompt()).append(", ");
@@ -364,8 +376,8 @@ public class StoryboardService {
             }
         }
 
-        // Inject scene reference (description + style + timeOfDay)
-        Scene scene = resolveInvolvedScene(sb);
+        // Inject scene reference (description + style + timeOfDay) — 使用预解析 projectId
+        Scene scene = refService.resolveInvolvedScene(sb, projectId);
         if (scene != null) {
             prompt.append("scene [").append(scene.getName()).append("]: ");
             if (scene.getDescription() != null && !scene.getDescription().isEmpty()) {
@@ -375,13 +387,12 @@ public class StoryboardService {
                 prompt.append(scene.getStyleHint()).append(", ");
             }
             if (scene.getTimeOfDay() != null) {
-                prompt.append(getTimeOfDayDescription(scene.getTimeOfDay())).append(", ");
+                prompt.append(refService.getTimeOfDayDescription(scene.getTimeOfDay())).append(", ");
             }
             if (scene.getWeather() != null) {
-                prompt.append(getWeatherDescription(scene.getWeather())).append(", ");
+                prompt.append(refService.getWeatherDescription(scene.getWeather())).append(", ");
             }
         } else if (sb.getInvolvedSceneName() != null && !sb.getInvolvedSceneName().isEmpty()) {
-            // Fallback: just use scene name when scene ID not resolved
             prompt.append("scene: ").append(sb.getInvolvedSceneName()).append(", ");
         }
 
@@ -423,7 +434,11 @@ public class StoryboardService {
         }
     }
 
-    private void applyRequestToStoryboard(StoryboardRequest req, Storyboard sb) {
+    /**
+     * 统一的请求→实体映射方法（含枚举异常保护）
+     * Controller 和 Service 统一使用此方法，避免职责重复
+     */
+    public void applyRequestToStoryboard(StoryboardRequest req, Storyboard sb) {
         if (req.getSequence() != null) sb.setSequence(req.getSequence());
         if (req.getTimeRange() != null) sb.setTimeRange(req.getTimeRange());
         if (req.getContinuity() != null) sb.setContinuity(req.getContinuity());
@@ -457,152 +472,16 @@ public class StoryboardService {
     // ==================== 角色/场景引用解析 ====================
 
     /**
-     * 解析分镜关联的角色实体列表
-     * 优先使用 involvedCharacterIds (ID列表)，回退到 involvedCharacters (名称匹配)
-     */
-    private List<Character> resolveInvolvedCharacters(Storyboard sb) {
-        List<Character> result = new ArrayList<>();
-
-        // 优先按 ID 解析
-        if (sb.getInvolvedCharacterIds() != null && !sb.getInvolvedCharacterIds().isEmpty()) {
-            try {
-                JsonNode ids = objectMapper.readTree(sb.getInvolvedCharacterIds());
-                if (ids.isArray()) {
-                    for (JsonNode node : ids) {
-                        Long charId = node.asLong();
-                        characterRepository.findById(charId).ifPresent(result::add);
-                    }
-                }
-            } catch (Exception e) {
-                log.warn("解析 involvedCharacterIds 失败: {}", e.getMessage());
-            }
-        }
-
-        // 回退: 按名称匹配（如果 ID 解析无结果）
-        if (result.isEmpty() && sb.getInvolvedCharacters() != null && !sb.getInvolvedCharacters().isEmpty()) {
-            try {
-                JsonNode names = objectMapper.readTree(sb.getInvolvedCharacters());
-                if (names.isArray()) {
-                    // 通过 episode → script → project 查找角色
-                    Long projectId = resolveProjectIdFromStoryboard(sb);
-                    if (projectId != null) {
-                        List<Character> projectChars = characterRepository.findByProjectIdOrderByNameAsc(projectId);
-                        for (JsonNode node : names) {
-                            String name = node.asText();
-                            projectChars.stream()
-                                    .filter(ch -> ch.getName().equalsIgnoreCase(name))
-                                    .findFirst()
-                                    .ifPresent(result::add);
-                        }
-                    }
-                }
-            } catch (Exception e) {
-                log.warn("按名称匹配角色失败: {}", e.getMessage());
-            }
-        }
-
-        return result;
-    }
-
-    /**
-     * 解析分镜关联的场景实体
-     * 优先使用 involvedSceneId，回退到 involvedSceneName (名称匹配)
-     */
-    private Scene resolveInvolvedScene(Storyboard sb) {
-        // 优先按 ID
-        if (sb.getInvolvedSceneId() != null) {
-            return sceneRepository.findById(sb.getInvolvedSceneId()).orElse(null);
-        }
-
-        // 回退: 按名称匹配
-        if (sb.getInvolvedSceneName() != null && !sb.getInvolvedSceneName().isEmpty()) {
-            Long projectId = resolveProjectIdFromStoryboard(sb);
-            if (projectId != null) {
-                List<Scene> projectScenes = sceneRepository.findByProjectIdOrderByNameAsc(projectId);
-                return projectScenes.stream()
-                        .filter(s -> s.getName().equalsIgnoreCase(sb.getInvolvedSceneName()))
-                        .findFirst()
-                        .orElse(null);
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * 从分镜反查项目ID (episode → script → project)
-     */
-    private Long resolveProjectIdFromStoryboard(Storyboard sb) {
-        try {
-            return episodeRepository.findById(sb.getEpisodeId())
-                    .map(Episode::getScriptId)
-                    .flatMap(scriptId -> scriptRepository.findById(scriptId)
-                            .map(com.aicomic.entity.Script::getProjectId))
-                    .orElse(null);
-        } catch (Exception e) {
-            log.warn("反查项目ID失败: {}", e.getMessage());
-            return null;
-        }
-    }
-
-    /**
-     * 收集分镜的所有参考图URL (角色定妆图 + 场景图)
-     * 用于传递给图像/视频模型作为参考输入
-     */
-    public List<String> collectReferenceImageUrls(Storyboard sb) {
-        List<String> urls = new ArrayList<>();
-
-        // 角色定妆图
-        List<Character> characters = resolveInvolvedCharacters(sb);
-        for (Character ch : characters) {
-            if (ch.getReferenceImageId() != null) {
-                // referenceImageId → asset.filePath (需要 AssetItem 查询)
-                // 这里暂用锚点提示词描述代替，后续集成 AssetItem
-                log.debug("角色 {} 有定妆图ID {}，暂跳过URL获取", ch.getName(), ch.getReferenceImageId());
-            }
-            // 如果角色有 anchorPrompt，作为描述性参考（不是URL）
-        }
-
-        // 场景正面图
-        Scene scene = resolveInvolvedScene(sb);
-        if (scene != null && scene.getFrontViewUrl() != null) {
-            urls.add(scene.getFrontViewUrl());
-        }
-
-        // 如果 storyboard 自身已有 referenceImageUrls 字段
-        if (sb.getReferenceImageUrls() != null && !sb.getReferenceImageUrls().isEmpty()) {
-            try {
-                JsonNode refUrls = objectMapper.readTree(sb.getReferenceImageUrls());
-                if (refUrls.isArray()) {
-                    for (JsonNode node : refUrls) {
-                        String url = node.asText();
-                        if (url != null && !url.isEmpty()) {
-                            urls.add(url);
-                        }
-                    }
-                }
-            } catch (Exception e) {
-                log.warn("解析 referenceImageUrls 失败: {}", e.getMessage());
-            }
-        }
-
-        return urls;
-    }
-
-    /**
      * 自动解析分镜的角色/场景引用（名称→ID）
-     * 将 involvedCharacters 名匹配为 involvedCharacterIds，
-     * 将 involvedSceneName 名匹配为 involvedSceneId，
-     * 同时收集参考图URL到 referenceImageUrls
+     * 委托 ReferenceResolutionService，预解析 projectId 避免多次反查
      */
     @Transactional
     public Storyboard resolveReferences(Long storyboardId) {
         Storyboard sb = findStoryboardById(storyboardId);
-
-        Long projectId = resolveProjectIdFromStoryboard(sb);
+        Long projectId = refService.resolveProjectIdFromStoryboard(sb);
 
         try {
-            // 解析角色名 → ID
+            // 解析角色名 → ID（使用批量查询）
             if (sb.getInvolvedCharacterIds() == null || sb.getInvolvedCharacterIds().isEmpty()) {
                 List<Long> charIds = new ArrayList<>();
                 if (sb.getInvolvedCharacters() != null && !sb.getInvolvedCharacters().isEmpty()) {
@@ -633,8 +512,8 @@ public class StoryboardService {
                         .ifPresent(s -> sb.setInvolvedSceneId(s.getId()));
             }
 
-            // 收集参考图URL
-            List<String> refUrls = collectReferenceImageUrls(sb);
+            // 收集参考图 URL（含角色定妆图 via AssetItem）
+            List<String> refUrls = refService.collectReferenceImageUrls(sb, projectId);
             if (!refUrls.isEmpty()) {
                 sb.setReferenceImageUrls(objectMapper.writeValueAsString(refUrls));
             }
@@ -643,28 +522,5 @@ public class StoryboardService {
         }
 
         return storyboardRepository.save(sb);
-    }
-
-    private String getTimeOfDayDescription(Scene.TimeOfDay tod) {
-        switch (tod) {
-            case MORNING: return "morning light";
-            case NOON: return "bright noon";
-            case AFTERNOON: return "afternoon warmth";
-            case EVENING: return "evening dusk";
-            case NIGHT: return "night time, dark";
-            case DAWN: return "dawn twilight";
-            default: return "";
-        }
-    }
-
-    private String getWeatherDescription(Scene.Weather w) {
-        switch (w) {
-            case SUNNY: return "clear sky";
-            case CLOUDY: return "overcast";
-            case RAINY: return "rainy";
-            case SNOWY: return "snowy";
-            case FOGGY: return "foggy atmosphere";
-            default: return "";
-        }
     }
 }

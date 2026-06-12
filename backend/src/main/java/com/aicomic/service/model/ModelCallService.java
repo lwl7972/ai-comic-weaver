@@ -91,6 +91,40 @@ public class ModelCallService {
     }
 
     /**
+     * 调用视频模型（同步封装：提交 + 轮询）
+     * 先通过 submitVideo 提交异步任务，然后轮询等待结果返回视频 URL
+     *
+     * @param prompt              提示词
+     * @param imageUrl            首帧参考图 URL（可选）
+     * @param preferredModelId    优先使用的模型配置 ID（可选）
+     * @return 生成的视频 URL
+     */
+    public String callVideo(String prompt, String imageUrl, Long preferredModelId) {
+        ModelConfig config = resolveConfig(ModelConfig.ModelType.VIDEO, preferredModelId);
+        String taskId = submitVideo(prompt, imageUrl, preferredModelId);
+
+        // 轮询等待视频生成结果（最长等待 5 分钟）
+        int maxPolls = 100;
+        int pollIntervalMs = 3000;
+        for (int i = 0; i < maxPolls; i++) {
+            try { Thread.sleep(pollIntervalMs); } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new ModelCallException("视频生成轮询被中断");
+            }
+            VideoResponse result = pollVideoResult(taskId, config.getId());
+            if (result.isSuccess() && result.getVideoUrl() != null) {
+                return result.getVideoUrl();
+            }
+            if (!result.isSuccess() && result.getErrorMessage() != null) {
+                throw new ModelCallException("视频生成失败: " + result.getErrorMessage());
+            }
+            // 任务仍在处理中，继续轮询
+            log.debug("视频任务 {} 轮询第 {} 次，仍在处理中...", taskId, i + 1);
+        }
+        throw new ModelCallException("视频生成超时: 任务 " + taskId + " 在 " + (maxPolls * pollIntervalMs / 1000) + " 秒内未完成");
+    }
+
+    /**
      * 调用视频模型（异步提交）
      *
      * @return 任务ID或run_id

@@ -45,7 +45,7 @@
     </el-card>
 
     <!-- Loading / Empty -->
-    <div v-if="directorStore.loading" class="loading-center">
+    <div v-if="storyboardStore.loading" class="loading-center">
       <el-icon class="is-loading"><Loading /></el-icon>
     </div>
     <div v-else-if="directorStore.storyboards.length === 0" class="empty-hint">
@@ -128,11 +128,13 @@ import {
 } from '@element-plus/icons-vue'
 import { useProjectStore } from '@/stores/project'
 import { useDirectorStore } from '@/stores/director'
+import { useStoryboardStore } from '@/stores/storyboard'
 import { useSceneStore } from '@/stores/scene'
 import type { Storyboard } from '@/types'
 
 const projectStore = useProjectStore()
 const directorStore = useDirectorStore()
+const storyboardStore = useStoryboardStore()
 const sceneStore = useSceneStore()
 
 function parseCharacterIds(jsonStr: string | undefined): number[] {
@@ -142,7 +144,8 @@ function parseCharacterIds(jsonStr: string | undefined): number[] {
 
 function getSceneUrl(sb: Storyboard): string | undefined {
   if (!sb.involvedSceneId) return undefined
-  const scene = sceneStore.scenes.find(s => s.id === sb.involvedSceneId)
+  // 前置过滤 undefined ID，避免 find() 做 undefined === undefined 的意外匹配
+  const scene = sceneStore.scenes.find(s => s.id != null && s.id === sb.involvedSceneId)
   return scene?.frontViewUrl
 }
 
