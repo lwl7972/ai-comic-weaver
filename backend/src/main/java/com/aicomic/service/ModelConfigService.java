@@ -4,14 +4,15 @@ import com.aicomic.common.exception.ResourceNotFoundException;
 import com.aicomic.common.util.CryptoUtils;
 import com.aicomic.entity.ModelConfig;
 import com.aicomic.repository.ModelConfigRepository;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestTemplate;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * 模型配置管理服务
@@ -21,10 +22,16 @@ import java.util.Optional;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class ModelConfigService {
 
     private final ModelConfigRepository modelConfigRepository;
+    private final RestTemplate aiRestTemplate;
+
+    public ModelConfigService(ModelConfigRepository modelConfigRepository,
+                              @Qualifier("aiRestTemplate") RestTemplate aiRestTemplate) {
+        this.modelConfigRepository = modelConfigRepository;
+        this.aiRestTemplate = aiRestTemplate;
+    }
 
     /**
      * 获取所有激活的模型配置（按优先级排序，apiKey 脱敏）
@@ -111,6 +118,140 @@ public class ModelConfigService {
             throw new ResourceNotFoundException("模型配置", id);
         }
         modelConfigRepository.deleteById(id);
+    }
+
+    /**
+     * 测试模型配置连接
+     * <p>
+     * 扣子工作流：调用 /v1/workflow/run 验证
+     * 通用模型：调用 /models 或 /chat/completions 端点验证
+     *
+     * @param configId 模型配置ID
+     * @return 测试结果 { success, responseTime(ms), message }
+     */
+    public Map<String, Object> testConnection(Long configId) {
+        ModelConfig config = modelConfigRepository.findById(configId)
+                .orElseThrow(() -> new ResourceNotFoundException("模型配置", configId));
+
+        // 解密 apiKey 用于测试
+        String apiKey = config.getApiKey();
+        if (apiKey != null && !apiKey.isEmpty()) {
+            apiKey = CryptoUtils.decrypt(apiKey);
+        }
+
+        long startTime = System.currentTimeMillis();
+        try {
+            boolean isCoze = Boolean.TRUE.equals(config.getIsCozeWorkflow());
+            if (isCoze) {
+                return testCozeWorkflow(config, apiKey, startTime);
+            } else {
+                return testGenericModel(config, apiKey, startTime);
+            }
+        } catch (RestClientException e) {
+            long elapsed = System.currentTimeMillis() - startTime;
+            log.warn("模型配置连接测试失败 [id={}, name={}]: {}", configId, config.getName(), e.getMessage());
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("success", false);
+            result.put("responseTime", elapsed);
+            result.put("message", "连接失败: " + e.getMessage());
+            return result;
+        }
+    }
+
+    /**
+     * 测试扣子工作流连接
+     */
+    private Map<String, Object> testCozeWorkflow(ModelConfig config, String apiKey, long startTime) {
+        String baseUrl = config.getApiUrl().replaceAll("/+$", "");
+        // 扣子工作流验证：调用 /v1/workflow/run 接口（dry-run 风格，仅验证连通性）
+        String url = baseUrl + "/v1/workflow/run";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(apiKey);
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("workflow_id", config.getWorkflowId());
+        body.put("parameters", Collections.emptyMap());
+
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
+        ResponseEntity<Map> response = aiRestTemplate.exchange(url, HttpMethod.POST, entity, Map.class);
+
+        long elapsed = System.currentTimeMillis() - startTime;
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("responseTime", elapsed);
+
+        if (response.getStatusCode().is2xxSuccessful()) {
+            log.info("扣子工作流连接测试成功 [id={}, name={}, time={}ms]", config.getId(), config.getName(), elapsed);
+            result.put("success", true);
+            result.put("message", "扣子工作流连接成功");
+        } else {
+            result.put("success", false);
+            result.put("message", "扣子工作流返回非2xx状态: " + response.getStatusCode());
+        }
+        return result;
+    }
+
+    /**
+     * 测试通用模型连接
+     * <p>
+     * 优先尝试 GET /models，失败则尝试 POST /chat/completions
+     */
+    private Map<String, Object> testGenericModel(ModelConfig config, String apiKey, long startTime) {
+        String baseUrl = config.getApiUrl().replaceAll("/+$", "");
+
+        // 优先尝试 /models 端点（轻量级，不需要消耗 token）
+        try {
+            String modelsUrl = baseUrl + "/models";
+            HttpHeaders headers = new HttpHeaders();
+            headers.setBearerAuth(apiKey);
+
+            HttpEntity<Void> entity = new HttpEntity<>(headers);
+            ResponseEntity<Map> response = aiRestTemplate.exchange(modelsUrl, HttpMethod.GET, entity, Map.class);
+
+            long elapsed = System.currentTimeMillis() - startTime;
+            if (response.getStatusCode().is2xxSuccessful()) {
+                log.info("模型连接测试成功(/models) [id={}, name={}, time={}ms]",
+                        config.getId(), config.getName(), elapsed);
+                Map<String, Object> result = new LinkedHashMap<>();
+                result.put("success", true);
+                result.put("responseTime", elapsed);
+                result.put("message", "模型连接成功");
+                return result;
+            }
+        } catch (RestClientException e) {
+            log.debug("/models 端点不可用，尝试 /chat/completions: {}", e.getMessage());
+        }
+
+        // 回退：尝试 /chat/completions（发送最小请求验证连通性）
+        String chatUrl = baseUrl + "/chat/completions";
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(apiKey);
+
+        Map<String, Object> message = Map.of("role", "user", "content", "hi");
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("model", config.getModelName());
+        body.put("messages", List.of(message));
+        body.put("max_tokens", 1);
+
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
+        ResponseEntity<Map> response = aiRestTemplate.exchange(chatUrl, HttpMethod.POST, entity, Map.class);
+
+        long elapsed = System.currentTimeMillis() - startTime;
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("responseTime", elapsed);
+
+        if (response.getStatusCode().is2xxSuccessful()) {
+            log.info("模型连接测试成功(/chat/completions) [id={}, name={}, time={}ms]",
+                    config.getId(), config.getName(), elapsed);
+            result.put("success", true);
+            result.put("message", "模型连接成功");
+        } else {
+            result.put("success", false);
+            result.put("message", "模型返回非2xx状态: " + response.getStatusCode());
+        }
+        return result;
     }
 
     // ==================== 加解密辅助方法 ====================

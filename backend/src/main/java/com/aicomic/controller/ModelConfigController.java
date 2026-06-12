@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 模型配置管理 API（ADR-6：模型无关抽象层）
@@ -83,5 +84,11 @@ public class ModelConfigController {
     public ApiResponse<Void> delete(@PathVariable Long id) {
         modelConfigService.deleteConfig(id);
         return ApiResponse.success();
+    }
+
+    /** POST /api/v1/model-configs/{id}/test-connection - 测试模型连接 */
+    @PostMapping("/{id}/test-connection")
+    public ApiResponse<Map<String, Object>> testConnection(@PathVariable Long id) {
+        return ApiResponse.success(modelConfigService.testConnection(id));
     }
 }
