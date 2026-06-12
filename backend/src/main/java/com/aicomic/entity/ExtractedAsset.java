@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
  * 用户在此表中逐一确认入库。
  */
 @Entity
-@Table(name = "extracted_asset", indexes = {@Index(name = "idx_extracted_asset_project_id", columnList = "projectId")})
+@Table(name = "extracted_asset", indexes = {@Index(name = "idx_extracted_asset_project_id", columnList = "project_id")})
 @Getter
 @Setter
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)

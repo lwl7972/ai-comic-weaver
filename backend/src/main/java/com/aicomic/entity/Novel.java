@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
  * 5.2 小说表
  */
 @Entity
-@Table(name = "novel", indexes = {@Index(name = "idx_novel_project_id", columnList = "projectId")})
+@Table(name = "novel", indexes = {@Index(name = "idx_novel_project_id", columnList = "project_id")})
 @Getter
 @Setter
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)

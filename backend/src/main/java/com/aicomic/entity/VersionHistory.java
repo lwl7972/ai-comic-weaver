@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
  * 跟踪对象类型: SCRIPT / EPISODE / CHARACTER / SCENE / STORYBOARD
  */
 @Entity
-@Table(name = "version_history", indexes = {@Index(name = "idx_version_history_object", columnList = "objectId, objectType")})
+@Table(name = "version_history", indexes = {@Index(name = "idx_version_history_object", columnList = "object_id, object_type")})
 @Getter
 @Setter
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)

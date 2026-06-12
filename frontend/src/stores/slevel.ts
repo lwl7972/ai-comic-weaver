@@ -36,9 +36,8 @@ export const useSLevelStore = defineStore('slevel', () => {
   async function exportVideo(projectId: number, episodeId: number, form: ExportForm) {
     generating.value = true
     try {
-      await http.post('/v1/video/export', {
+      await http.post(`/v1/episodes/${episodeId}/export`, {
         projectId,
-        episodeId,
         format: form.format,
         resolution: form.resolution,
         bitrate: form.bitrate,
@@ -55,9 +54,8 @@ export const useSLevelStore = defineStore('slevel', () => {
   async function addWatermark(projectId: number, episodeId: number, form: WatermarkForm) {
     generating.value = true
     try {
-      await http.post('/v1/video/watermark', {
+      await http.post(`/v1/episodes/${episodeId}/watermark`, {
         projectId,
-        episodeId,
         watermarkType: form.watermarkType,
         watermarkContent: form.watermarkContent,
         imagePath: form.imagePath,

@@ -33,7 +33,6 @@ public class ProjectTemplate {
     private StyleType style;
 
     /** 模板数据JSON (包含预设的角色/场景/提示词配置等) */
-    @Lob
     @Column(columnDefinition = "TEXT")
     private String templateData;
 

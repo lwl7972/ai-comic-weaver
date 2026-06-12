@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
  * 5.6 角色表 - 支持6层身份锚点 (ADR-10) 和角色圣经管理
  */
 @Entity
-@Table(name = "character", indexes = {@Index(name = "idx_character_project_id", columnList = "projectId")})
+@Table(name = "character", indexes = {@Index(name = "idx_character_project_id", columnList = "project_id")})
 @Getter
 @Setter
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)

@@ -43,9 +43,9 @@ class SseClient {
     let url: string
     if ((window as any).electronAPI?.getBackendPort) {
       const port = await (window as any).electronAPI.getBackendPort()
-      url = `http://localhost:${port}/api/v1/sse/subscribe`
+      url = `http://localhost:${port}/api/v1/sse/connect`
     } else {
-      url = `${this.baseUrl}/v1/sse/subscribe`
+      url = `${this.baseUrl}/v1/sse/connect`
     }
 
     this.eventSource = new EventSource(url)

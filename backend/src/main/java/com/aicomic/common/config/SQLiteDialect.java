@@ -34,7 +34,7 @@ public class SQLiteDialect extends Dialect {
         registerColumnType(Types.VARBINARY, "blob");
         registerColumnType(Types.LONGVARBINARY, "blob");
         registerColumnType(Types.BLOB, "blob");
-        registerColumnType(Types.CLOB, "clob");
+        registerColumnType(Types.CLOB, "text");
         registerColumnType(Types.BOOLEAN, "integer");
     }
 
@@ -67,6 +67,11 @@ public class SQLiteDialect extends Dialect {
     @Override
     public String getAddPrimaryKeyConstraintString(String constraintName) {
         return "";
+    }
+
+    @Override
+    public String getAddColumnString() {
+        return "add column";
     }
 
     private static class SQLiteIdentityColumnSupport extends IdentityColumnSupportImpl {

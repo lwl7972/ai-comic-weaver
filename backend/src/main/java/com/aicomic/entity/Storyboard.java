@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
  * 支持专业电影级参数: 景别/机位/运镜/情绪
  */
 @Entity
-@Table(name = "storyboard", indexes = {@Index(name = "idx_storyboard_episode_id", columnList = "episodeId")}, uniqueConstraints = {@UniqueConstraint(name = "uk_storyboard_episode_seq", columnNames = {"episodeId", "sequence"})})
+@Table(name = "storyboard", indexes = {@Index(name = "idx_storyboard_episode_id", columnList = "episode_id")}, uniqueConstraints = {@UniqueConstraint(name = "uk_storyboard_episode_seq", columnNames = {"episode_id", "sequence"})})
 @Getter
 @Setter
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)

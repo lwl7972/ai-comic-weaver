@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
  * 5.5 剧集表
  */
 @Entity
-@Table(name = "episode", indexes = {@Index(name = "idx_episode_script_id", columnList = "scriptId")})
+@Table(name = "episode", indexes = {@Index(name = "idx_episode_script_id", columnList = "script_id")})
 @Getter
 @Setter
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)

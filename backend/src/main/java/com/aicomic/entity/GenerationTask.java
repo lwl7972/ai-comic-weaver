@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
  * 任务调度方案 (ADR-8): Spring @Async + ThreadPoolTaskExecutor
  */
 @Entity
-@Table(name = "generation_task", indexes = {@Index(name = "idx_generation_task_target", columnList = "targetType, targetId")})
+@Table(name = "generation_task", indexes = {@Index(name = "idx_generation_task_target", columnList = "target_type, target_id")})
 @Getter
 @Setter
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)

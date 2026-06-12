@@ -717,21 +717,19 @@ const appSettings = reactive({
 async function loadAppConfig() {
   try {
     const res = await http.get('/v1/app-config')
-    const configs: { key: string; value: string }[] = res.data?.data ?? res.data ?? []
-    for (const c of configs) {
-      if (c.key === 'storagePath') appSettings.storagePath = c.value
-      else if (c.key === 'theme') appSettings.theme = c.value as 'light' | 'dark'
-      else if (c.key === 'autoBackup') appSettings.autoBackup = c.value === 'true'
-    }
+    // 后端返回 Map<String, String>，前端解包后得到 Record<string, string>
+    const map: Record<string, string> = res.data?.data ?? res.data ?? {}
+    if (map.storagePath) appSettings.storagePath = map.storagePath
+    if (map.theme) appSettings.theme = map.theme as 'light' | 'dark'
+    if (map.autoBackup) appSettings.autoBackup = map.autoBackup === 'true'
   } catch { /* ignore */ }
 }
 
 async function handleAppSettingChange() {
   try {
+    // 后端 PUT /api/v1/app-config 期望 Map<String, String> 格式
     await http.put('/v1/app-config', {
-      configs: [
-        { key: 'autoBackup', value: String(appSettings.autoBackup) },
-      ],
+      autoBackup: String(appSettings.autoBackup),
     })
     notify.success('设置已保存')
   } catch (e: any) {
@@ -741,8 +739,9 @@ async function handleAppSettingChange() {
 
 async function handleThemeChange(val: string) {
   try {
+    // 后端 PUT /api/v1/app-config 期望 Map<String, String> 格式
     await http.put('/v1/app-config', {
-      configs: [{ key: 'theme', value: val }],
+      theme: val,
     })
     // 实际主题切换由 CSS class 控制
     document.documentElement.classList.toggle('dark', val === 'dark')
@@ -757,8 +756,9 @@ async function selectStoragePath() {
   if (path) {
     appSettings.storagePath = path
     try {
+      // 后端 PUT /api/v1/app-config 期望 Map<String, String> 格式
       await http.put('/v1/app-config', {
-        configs: [{ key: 'storagePath', value: path }],
+        storagePath: path,
       })
       notify.success('存储路径已更新')
     } catch (e: any) {

@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
  * 5.8 场景表 - 支持四视图生成 (ADR-11)
  */
 @Entity
-@Table(name = "scene", indexes = {@Index(name = "idx_scene_project_id", columnList = "projectId")})
+@Table(name = "scene", indexes = {@Index(name = "idx_scene_project_id", columnList = "project_id")})
 @Getter
 @Setter
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
