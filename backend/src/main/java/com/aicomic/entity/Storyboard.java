@@ -76,9 +76,21 @@ public class Storyboard {
     @Column(name = "involved_characters", columnDefinition = "TEXT")
     private String involvedCharacters;
 
+    /** 本分镜涉及的角色ID列表 (JSON数组，角色定妆图引用传递) */
+    @Column(name = "involved_character_ids", columnDefinition = "TEXT")
+    private String involvedCharacterIds;
+
     /** 本分镜所在场景名称 */
     @Column(name = "involved_scene_name", length = 200)
     private String involvedSceneName;
+
+    /** 本分镜所在场景ID (场景图引用传递) */
+    @Column(name = "involved_scene_id")
+    private Long involvedSceneId;
+
+    /** 收集的参考图URL列表 (JSON数组: 角色定妆图+场景图) */
+    @Column(name = "reference_image_urls", columnDefinition = "TEXT")
+    private String referenceImageUrls;
 
     /** 背景音效建议 */
     @Column(name = "bg_sound", length = 200)

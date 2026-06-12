@@ -78,6 +78,12 @@ public class StoryboardController {
         return ApiResponse.success();
     }
 
+    /** POST /api/v1/storyboards/{id}/resolve-references - 自动解析角色/场景引用（名称→ID） */
+    @PostMapping("/storyboards/{id}/resolve-references")
+    public ApiResponse<Storyboard> resolveReferences(@PathVariable Long id) {
+        return ApiResponse.success(storyboardService.resolveReferences(id));
+    }
+
     // ==================== Helper ====================
 
     private void applyRequestToStoryboard(StoryboardRequest req, Storyboard sb) {
@@ -90,9 +96,12 @@ public class StoryboardController {
         if (req.getShotSize() != null) sb.setShotSize(Storyboard.ShotSize.valueOf(req.getShotSize()));
         if (req.getCameraAngle() != null) sb.setCameraAngle(Storyboard.CameraAngle.valueOf(req.getCameraAngle()));
         if (req.getCameraMovement() != null) sb.setCameraMovement(Storyboard.CameraMovement.valueOf(req.getCameraMovement()));
-        if (req.getInvolvedCharacters() != null) sb.setInvolvedCharacters(req.getInvolvedCharacters());
-        if (req.getInvolvedSceneName() != null) sb.setInvolvedSceneName(req.getInvolvedSceneName());
-        if (req.getBgSound() != null) sb.setBgSound(req.getBgSound());
+if (req.getInvolvedCharacters() != null) sb.setInvolvedCharacters(req.getInvolvedCharacters());
+    if (req.getInvolvedCharacterIds() != null) sb.setInvolvedCharacterIds(req.getInvolvedCharacterIds());
+    if (req.getInvolvedSceneName() != null) sb.setInvolvedSceneName(req.getInvolvedSceneName());
+    if (req.getInvolvedSceneId() != null) sb.setInvolvedSceneId(req.getInvolvedSceneId());
+    if (req.getReferenceImageUrls() != null) sb.setReferenceImageUrls(req.getReferenceImageUrls());
+    if (req.getBgSound() != null) sb.setBgSound(req.getBgSound());
         if (req.getGenerationPurpose() != null) sb.setGenerationPurpose(Storyboard.GenerationPurpose.valueOf(req.getGenerationPurpose()));
     }
 }

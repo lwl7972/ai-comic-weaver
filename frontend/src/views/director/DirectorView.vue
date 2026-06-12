@@ -84,6 +84,17 @@
               <el-tag size="small">{{ getShotSizeLabel(sb.shotSize) }}</el-tag>
               <el-tag size="small" type="success">{{ getCameraAngleLabel(sb.cameraAngle) }}</el-tag>
               <el-tag size="small" type="warning">{{ getCameraMovementLabel(sb.cameraMovement) }}</el-tag>
+              <!-- 角色/场景引用标识 -->
+              <el-tag v-if="sb.involvedCharacterIds" size="small" type="primary">
+                角色({{ parseCharacterIds(sb.involvedCharacterIds).length }}人)
+              </el-tag>
+              <el-tag v-if="sb.involvedSceneId" size="small" type="success">
+                场景已关联
+              </el-tag>
+            </div>
+            <!-- 参考图缩略图 -->
+            <div v-if="sb.involvedSceneId && getSceneUrl(sb)" class="shot-ref-images">
+              <img :src="getSceneUrl(sb)" class="shot-ref-thumb" title="场景参考图" />
             </div>
           </div>
         </div>
@@ -117,17 +128,34 @@ import {
 } from '@element-plus/icons-vue'
 import { useProjectStore } from '@/stores/project'
 import { useDirectorStore } from '@/stores/director'
+import { useSceneStore } from '@/stores/scene'
 import type { Storyboard } from '@/types'
 
 const projectStore = useProjectStore()
 const directorStore = useDirectorStore()
+const sceneStore = useSceneStore()
+
+function parseCharacterIds(jsonStr: string | undefined): number[] {
+  if (!jsonStr) return []
+  try { return JSON.parse(jsonStr) } catch { return [] }
+}
+
+function getSceneUrl(sb: Storyboard): string | undefined {
+  if (!sb.involvedSceneId) return undefined
+  const scene = sceneStore.scenes.find(s => s.id === sb.involvedSceneId)
+  return scene?.frontViewUrl
+}
 
 const episodeId = computed(() => projectStore.currentProject?.currentEpisodeId || 1)
+const projectId = computed(() => projectStore.currentProject?.id)
 
 let statusTimer: ReturnType<typeof setInterval> | null = null
 
 onMounted(async () => {
   await directorStore.fetchStoryboards(episodeId.value)
+  if (projectId.value) {
+    await sceneStore.fetchScenes(projectId.value)
+  }
   startStatusPolling()
 })
 
@@ -325,6 +353,18 @@ function getCameraMovementLabel(cm: string) {
   display: flex;
   gap: 4px;
   flex-wrap: wrap;
+}
+.shot-ref-images {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+.shot-ref-thumb {
+  width: 32px;
+  height: 24px;
+  border-radius: 3px;
+  object-fit: cover;
+  border: 1px solid #ebeef5;
 }
 .shot-footer {
   display: flex;

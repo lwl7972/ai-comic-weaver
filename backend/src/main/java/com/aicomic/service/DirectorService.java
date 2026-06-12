@@ -1,18 +1,27 @@
 package com.aicomic.service;
 
 import com.aicomic.common.exception.ResourceNotFoundException;
+import com.aicomic.entity.Character;
 import com.aicomic.entity.Episode;
 import com.aicomic.entity.ModelConfig;
+import com.aicomic.entity.Scene;
+import com.aicomic.entity.Script;
 import com.aicomic.entity.Storyboard;
+import com.aicomic.repository.CharacterRepository;
 import com.aicomic.repository.EpisodeRepository;
+import com.aicomic.repository.SceneRepository;
+import com.aicomic.repository.ScriptRepository;
 import com.aicomic.repository.StoryboardRepository;
 import com.aicomic.service.model.ModelCallException;
 import com.aicomic.service.model.ModelCallService;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -29,8 +38,12 @@ public class DirectorService {
 
     private final StoryboardRepository storyboardRepository;
     private final EpisodeRepository episodeRepository;
+    private final ScriptRepository scriptRepository;
+    private final CharacterRepository characterRepository;
+    private final SceneRepository sceneRepository;
     private final ModelCallService modelCallService;
     private final SseService sseService;
+    private final ObjectMapper objectMapper;
 
     /**
      * 生成整集视频（异步执行）
@@ -265,6 +278,28 @@ public class DirectorService {
         StringBuilder prompt = new StringBuilder();
         prompt.append("Comic manga animation, ");
 
+        // Inject character references
+        List<Character> characters = resolveInvolvedCharacters(sb);
+        for (Character ch : characters) {
+            if (ch.getAnchorPrompt() != null && !ch.getAnchorPrompt().isEmpty()) {
+                prompt.append("character [").append(ch.getName()).append("]: ").append(ch.getAnchorPrompt()).append(", ");
+            } else if (ch.getAppearance() != null && !ch.getAppearance().isEmpty()) {
+                prompt.append("character [").append(ch.getName()).append("]: ").append(ch.getAppearance()).append(", ");
+            }
+        }
+
+        // Inject scene reference
+        Scene scene = resolveInvolvedScene(sb);
+        if (scene != null) {
+            prompt.append("scene [").append(scene.getName()).append("]: ");
+            if (scene.getDescription() != null && !scene.getDescription().isEmpty()) {
+                prompt.append(scene.getDescription()).append(", ");
+            }
+            if (scene.getStyleHint() != null && !scene.getStyleHint().isEmpty()) {
+                prompt.append(scene.getStyleHint()).append(", ");
+            }
+        }
+
         if (sb.getAction() != null && !sb.getAction().isEmpty()) {
             prompt.append(sb.getAction()).append(", ");
         }
@@ -294,6 +329,123 @@ public class DirectorService {
 
         prompt.append("coherent scenes, smooth transitions, cinematic quality, anime style");
         return prompt.toString();
+    }
+
+    // ==================== 角色/场景引用解析 ====================
+
+    private List<Character> resolveInvolvedCharacters(Storyboard sb) {
+        List<Character> result = new ArrayList<>();
+
+        // 优先按 ID 解析
+        if (sb.getInvolvedCharacterIds() != null && !sb.getInvolvedCharacterIds().isEmpty()) {
+            try {
+                JsonNode ids = objectMapper.readTree(sb.getInvolvedCharacterIds());
+                if (ids.isArray()) {
+                    for (JsonNode node : ids) {
+                        Long charId = node.asLong();
+                        characterRepository.findById(charId).ifPresent(result::add);
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("解析 involvedCharacterIds 失败: {}", e.getMessage());
+            }
+        }
+
+        // 回退: 按名称匹配
+        if (result.isEmpty() && sb.getInvolvedCharacters() != null && !sb.getInvolvedCharacters().isEmpty()) {
+            try {
+                JsonNode names = objectMapper.readTree(sb.getInvolvedCharacters());
+                if (names.isArray()) {
+                    Long projectId = resolveProjectIdFromStoryboard(sb);
+                    if (projectId != null) {
+                        List<Character> projectChars = characterRepository.findByProjectIdOrderByNameAsc(projectId);
+                        for (JsonNode node : names) {
+                            String name = node.asText();
+                            projectChars.stream()
+                                    .filter(ch -> ch.getName().equalsIgnoreCase(name))
+                                    .findFirst()
+                                    .ifPresent(result::add);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("按名称匹配角色失败: {}", e.getMessage());
+            }
+        }
+
+        return result;
+    }
+
+    private Scene resolveInvolvedScene(Storyboard sb) {
+        if (sb.getInvolvedSceneId() != null) {
+            return sceneRepository.findById(sb.getInvolvedSceneId()).orElse(null);
+        }
+
+        if (sb.getInvolvedSceneName() != null && !sb.getInvolvedSceneName().isEmpty()) {
+            Long projectId = resolveProjectIdFromStoryboard(sb);
+            if (projectId != null) {
+                List<Scene> projectScenes = sceneRepository.findByProjectIdOrderByNameAsc(projectId);
+                return projectScenes.stream()
+                        .filter(s -> s.getName().equalsIgnoreCase(sb.getInvolvedSceneName()))
+                        .findFirst()
+                        .orElse(null);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * 收集分镜的参考图URL (角色定妆图 + 场景图 + storyboard 自身 referenceImageUrls)
+     */
+    private List<String> collectReferenceImageUrls(Storyboard sb) {
+        List<String> urls = new ArrayList<>();
+
+        // 角色定妆图
+        List<Character> characters = resolveInvolvedCharacters(sb);
+        for (Character ch : characters) {
+            if (ch.getReferenceImageId() != null) {
+                log.debug("角色 {} 有定妆图ID {}，暂跳过URL获取", ch.getName(), ch.getReferenceImageId());
+            }
+        }
+
+        // 场景正面图
+        Scene scene = resolveInvolvedScene(sb);
+        if (scene != null && scene.getFrontViewUrl() != null) {
+            urls.add(scene.getFrontViewUrl());
+        }
+
+        // storyboard 自身的 referenceImageUrls
+        if (sb.getReferenceImageUrls() != null && !sb.getReferenceImageUrls().isEmpty()) {
+            try {
+                JsonNode refUrls = objectMapper.readTree(sb.getReferenceImageUrls());
+                if (refUrls.isArray()) {
+                    for (JsonNode node : refUrls) {
+                        String url = node.asText();
+                        if (url != null && !url.isEmpty()) {
+                            urls.add(url);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("解析 referenceImageUrls 失败: {}", e.getMessage());
+            }
+        }
+
+        return urls;
+    }
+
+    private Long resolveProjectIdFromStoryboard(Storyboard sb) {
+        try {
+            return episodeRepository.findById(sb.getEpisodeId())
+                    .map(Episode::getScriptId)
+                    .flatMap(scriptId -> scriptRepository.findById(scriptId)
+                            .map(Script::getProjectId))
+                    .orElse(null);
+        } catch (Exception e) {
+            log.warn("反查项目ID失败: {}", e.getMessage());
+            return null;
+        }
     }
 
     private String getMovementDescription(Storyboard.CameraMovement cm) {

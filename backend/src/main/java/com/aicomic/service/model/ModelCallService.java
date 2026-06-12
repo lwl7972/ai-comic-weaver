@@ -65,10 +65,22 @@ public class ModelCallService {
      * 调用图像模型（同步）
      */
     public String callImage(String prompt, Long preferredModelId) {
+        return callImage(prompt, null, preferredModelId);
+    }
+
+    /**
+     * 调用图像模型（同步，支持参考图）
+     *
+     * @param prompt              提示词
+     * @param referenceImageUrl   参考图URL（角色定妆图/场景图等，可选）
+     * @param preferredModelId    优先使用的模型配置ID
+     */
+    public String callImage(String prompt, String referenceImageUrl, Long preferredModelId) {
         ModelConfig config = resolveConfig(ModelConfig.ModelType.IMAGE, preferredModelId);
         ModelProvider provider = resolveProvider(config);
         ImageRequest request = ImageRequest.builder()
                 .prompt(prompt)
+                .referenceImageUrl(referenceImageUrl)
                 .modelConfig(config)
                 .build();
         ImageResponse response = provider.generateImage(request);

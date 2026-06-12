@@ -120,10 +120,28 @@
             <div class="sb-meta">
               <span v-if="sb.involvedSceneName">
                 <el-icon><Location /></el-icon> {{ sb.involvedSceneName }}
+                <el-tag v-if="sb.involvedSceneId" size="small" type="success" class="ref-badge">
+                  <el-icon><Link /></el-icon> 已关联
+                </el-tag>
+              </span>
+              <span v-if="sb.involvedCharacters">
+                <el-icon><User /></el-icon> {{ parseCharacterNames(sb.involvedCharacters).join(', ') }}
+                <el-tag v-if="sb.involvedCharacterIds" size="small" type="primary" class="ref-badge">
+                  <el-icon><Link /></el-icon> 已关联
+                </el-tag>
               </span>
               <span v-if="sb.bgSound">
                 <el-icon><Headset /></el-icon> {{ sb.bgSound }}
               </span>
+            </div>
+
+            <!-- Reference images preview -->
+            <div v-if="sb.referenceImageUrls" class="sb-refs">
+              <span class="refs-label">参考图：</span>
+              <div class="refs-images">
+                <img v-for="(url, idx) in parseRefUrls(sb.referenceImageUrls)" :key="idx" 
+                     :src="url" class="ref-thumb" alt="参考图" />
+              </div>
             </div>
           </div>
         </div>
@@ -218,6 +236,60 @@
             </el-form-item>
           </el-col>
         </el-row>
+
+        <!-- 角色引用选择 -->
+        <el-form-item label="关联角色">
+          <el-select
+            v-model="selectedCharacterIds"
+            multiple
+            collapse-tags
+            collapse-tags-tooltip
+            placeholder="选择关联的角色（定妆图引用）"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="ch in characterStore.characters"
+              :key="ch.id"
+              :label="`${ch.name} (${ch.role})`"
+              :value="ch.id!"
+            >
+              <span>{{ ch.name }}</span>
+              <el-tag size="small" style="margin-left: 8px">{{ ch.role }}</el-tag>
+            </el-option>
+          </el-select>
+          <div v-if="selectedCharacterIds.length > 0" class="ref-preview">
+            <span class="preview-label">角色定妆图将作为参考传入分镜图生成</span>
+          </div>
+        </el-form-item>
+
+        <!-- 场景引用选择 -->
+        <el-form-item label="关联场景">
+          <el-select
+            v-model="selectedSceneId"
+            placeholder="选择关联的场景（场景图引用）"
+            clearable
+            style="width: 100%"
+          >
+            <el-option
+              v-for="sc in sceneStore.scenes"
+              :key="sc.id"
+              :label="`${sc.name}${sc.styleHint ? ` (${sc.styleHint})` : ''}`"
+              :value="sc.id!"
+            >
+              <div style="display: flex; align-items: center; gap: 8px">
+                <img v-if="sc.frontViewUrl" :src="sc.frontViewUrl" class="scene-thumb-option" />
+                <span>{{ sc.name }}</span>
+                <el-tag v-if="sc.timeOfDay" size="small" type="info">{{ sc.timeOfDay }}</el-tag>
+              </div>
+            </el-option>
+          </el-select>
+          <div v-if="selectedSceneId" class="ref-preview">
+            <img v-if="getSceneThumbnail(sceneStore.scenes.find(s => s.id === selectedSceneId)!)"
+                 :src="getSceneThumbnail(sceneStore.scenes.find(s => s.id === selectedSceneId)!)"
+                 class="ref-thumb-preview" />
+            <span class="preview-label">场景正面图将作为参考传入分镜图/视频生成</span>
+          </div>
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showEditDialog = false">取消</el-button>
@@ -231,19 +303,53 @@
 import { ref, onMounted, computed } from 'vue'
 import {
   Cpu, PictureFilled, Loading, Refresh, WarningFilled, Picture,
-  ChatDotRound, Location, Headset, Edit, Delete,
+  ChatDotRound, Location, Headset, Edit, Delete, User, Landscape, Link,
 } from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus'
 import { useProjectStore } from '@/stores/project'
 import { useStoryboardStore } from '@/stores/storyboard'
-import type { Storyboard, ShotSize, CameraAngle, CameraMovement, StoryboardStatus } from '@/types'
+import { useCharacterStore } from '@/stores/character'
+import { useSceneStore } from '@/stores/scene'
+import type { Storyboard, ShotSize, CameraAngle, CameraMovement, StoryboardStatus, Character, Scene } from '@/types'
 
 const projectStore = useProjectStore()
 const store = useStoryboardStore()
+const characterStore = useCharacterStore()
+const sceneStore = useSceneStore()
 
 const showEditDialog = ref(false)
 const editingIndex = ref(-1)
 const editForm = ref<Partial<Storyboard> | null>(null)
+
+// 角色和场景选择器
+const selectedCharacterIds = ref<number[]>([])
+const selectedSceneId = ref<number | null>(null)
+
+// 解析 involvedCharacters/involvedCharacterIds 为 name/ID 数组
+function parseCharacterNames(jsonStr: string | undefined): string[] {
+  if (!jsonStr) return []
+  try { return JSON.parse(jsonStr) } catch { return [] }
+}
+
+function parseCharacterIds(jsonStr: string | undefined): number[] {
+  if (!jsonStr) return []
+  try { return JSON.parse(jsonStr) } catch { return [] }
+}
+
+// 获取角色定妆图URL（通过 referenceImageId → AssetItem 的路径暂时简化）
+function getCharacterThumbnail(ch: Character): string | undefined {
+  // 暂时没有直接的定妆图URL字段，后续集成 AssetItem 后可完善
+  return undefined
+}
+
+function getSceneThumbnail(scene: Scene): string | undefined {
+  return scene.frontViewUrl
+}
+
+function parseRefUrls(jsonStr: string | undefined): string[] {
+  if (!jsonStr) return []
+  try { return JSON.parse(jsonStr) } catch { return [] }
+}
 
 const currentStep = computed(() => {
   const sbs = store.storyboards
@@ -256,9 +362,15 @@ const currentStep = computed(() => {
 // Get the current episode ID from project
 const episodeId = computed(() => projectStore.currentProject?.currentEpisodeId || 1)
 
+const projectId = computed(() => projectStore.currentProject?.id)
+
 onMounted(async () => {
   if (episodeId.value) {
     await store.fetchStoryboards(episodeId.value)
+  }
+  if (projectId.value) {
+    await characterStore.fetchCharacters(projectId.value)
+    await sceneStore.fetchScenes(projectId.value)
   }
 })
 
@@ -279,13 +391,34 @@ async function handleRegenerateImage(storyboardId: number) {
 function handleEditStoryboard(sb: Storyboard, index: number) {
   editingIndex.value = index
   editForm.value = { ...sb }
+  // 初始化角色/场景选择器
+  selectedCharacterIds.value = parseCharacterIds(sb.involvedCharacterIds)
+  selectedSceneId.value = sb.involvedSceneId ?? null
   showEditDialog.value = true
 }
 
 async function handleSaveEdit() {
   if (!editForm.value?.id) return
   try {
+    // 写入角色ID和场景ID到 editForm
+    editForm.value.involvedCharacterIds = JSON.stringify(selectedCharacterIds.value)
+    editForm.value.involvedSceneId = selectedSceneId.value ?? undefined
+    // 同步更新角色名列表（如果 ID 改变了）
+    if (selectedCharacterIds.value.length > 0) {
+      const names = selectedCharacterIds.value.map(id => {
+        const ch = characterStore.characters.find(c => c.id === id)
+        return ch?.name || ''
+      }).filter(Boolean)
+      editForm.value.involvedCharacters = JSON.stringify(names)
+    }
+    // 同步更新场景名
+    if (selectedSceneId.value) {
+      const scene = sceneStore.scenes.find(s => s.id === selectedSceneId.value)
+      if (scene) editForm.value.involvedSceneName = scene.name
+    }
     await store.updateStoryboard(editForm.value.id, editForm.value)
+    // 保存后自动解析引用，收集参考图URL
+    await store.resolveReferences(editForm.value.id)
     showEditDialog.value = false
   } catch (err: any) {
     console.error('[StoryboardView] 保存编辑失败:', err.message)
@@ -514,6 +647,58 @@ function getCameraMovementLabel(cm: string) {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+.ref-badge {
+  margin-left: 4px;
+  font-size: 11px;
+}
+.sb-refs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #909399;
+}
+.refs-label {
+  color: #c0c4cc;
+}
+.refs-images {
+  display: flex;
+  gap: 4px;
+}
+.ref-thumb {
+  width: 36px;
+  height: 36px;
+  border-radius: 4px;
+  object-fit: cover;
+  border: 1px solid #ebeef5;
+}
+.ref-placeholder {
+  background: #f5f7fa;
+}
+.ref-preview {
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.preview-label {
+  font-size: 12px;
+  color: #909399;
+}
+.ref-thumb-preview {
+  width: 48px;
+  height: 36px;
+  border-radius: 4px;
+  object-fit: cover;
+  border: 1px solid #ebeef5;
+}
+.scene-thumb-option {
+  width: 32px;
+  height: 24px;
+  border-radius: 3px;
+  object-fit: cover;
+  border: 1px solid #ebeef5;
 }
 .sb-actions {
   display: flex;

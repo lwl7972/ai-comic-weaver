@@ -211,7 +211,10 @@ export interface Storyboard {
   cameraAngle: CameraAngle   // 机位角度
   cameraMovement: CameraMovement // 运镜方式
   involvedCharacters: string // JSON array of character names
+  involvedCharacterIds?: string // JSON array of character IDs (角色定妆图引用)
   involvedSceneName: string
+  involvedSceneId?: number   // 场景ID (场景图引用)
+  referenceImageUrls?: string // JSON array of collected reference image URLs
   bgSound?: string
   generatedImageUrl?: string // 生成的分镜图URL
   generatedVideoUrl?: string // 生成的视频URL

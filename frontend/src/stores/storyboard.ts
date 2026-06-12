@@ -110,9 +110,24 @@ export const useStoryboardStore = defineStore('storyboard', () => {
     }
   }
 
+  /** 自动解析分镜的角色/场景引用 (名称→ID，收集参考图URL) */
+  async function resolveReferences(storyboardId: number) {
+    try {
+      const res = await http.post(`/v1/storyboards/${storyboardId}/resolve-references`)
+      const updated = res.data
+      const idx = storyboards.value.findIndex(s => s.id === storyboardId)
+      if (idx >= 0) storyboards.value[idx] = updated
+      return updated
+    } catch (err: any) {
+      useNotificationStore().error('解析引用失败', err.message)
+      throw err
+    }
+  }
+
   return {
     storyboards, loading, generating,
     fetchStoryboards, createStoryboard, updateStoryboard, deleteStoryboard,
     parseScript, batchUpdateStoryboards, generateImages, regenerateImage,
+    resolveReferences,
   }
 })

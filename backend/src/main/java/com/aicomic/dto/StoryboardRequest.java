@@ -21,7 +21,10 @@ public class StoryboardRequest {
     private String cameraAngle;
     private String cameraMovement;
     private String involvedCharacters;
+    private String involvedCharacterIds;   // JSON array of character IDs (角色定妆图引用)
     private String involvedSceneName;
+    private Long involvedSceneId;          // 场景ID (场景图引用)
+    private String referenceImageUrls;     // JSON array of collected reference image URLs
     private String bgSound;
     private String generationPurpose;
 }
