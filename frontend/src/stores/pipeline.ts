@@ -51,8 +51,9 @@ export const usePipelineStore = defineStore('pipeline', () => {
   async function advanceStage(projectId: number, targetStage: PipelineStage, reExecute: boolean = false) {
     loading.value = true
     try {
-      const res = await http.post(`/v1/projects/${projectId}/pipeline-advance`, null, {
-        params: { targetStage, reExecute },
+      const res = await http.post(`/v1/projects/${projectId}/pipeline-advance`, {
+        targetStage,
+        reExecute,
       })
       pipelineState.value = res.data
       useNotificationStore().success('阶段推进成功', `已进入 ${stageDisplayName(targetStage)} 阶段`)

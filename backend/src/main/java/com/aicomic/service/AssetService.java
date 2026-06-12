@@ -31,6 +31,9 @@ public class AssetService {
     @Value("${app.storage.path:./data}")
     private String storageBasePath;
 
+    @Value("${app.upload.max-size:104857600}") // 100MB
+    private long maxUploadSize;
+
     // ==================== 查询 ====================
 
     /**
@@ -75,6 +78,9 @@ public class AssetService {
     public AssetItem uploadAsset(Long projectId, MultipartFile file, String tags) {
         if (file.isEmpty()) {
             throw new IllegalArgumentException("上传文件不能为空");
+        }
+        if (file.getSize() > maxUploadSize) {
+            throw new IllegalArgumentException("文件大小超过限制(" + maxUploadSize / 1024 / 1024 + "MB)");
         }
 
         String originalFilename = file.getOriginalFilename();

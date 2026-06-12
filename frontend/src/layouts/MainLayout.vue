@@ -144,19 +144,25 @@ async function handleMenuSelect(index: string) {
   if (pipelineStore.isStageDirty(targetStage)) {
     try {
       await ElMessageBox.confirm(
-        `上游数据已变更，${pipelineStore.stageDisplayName(targetStage)}模块可能需要重新执行。是否继续？`,
+        `上游数据已变更，${pipelineStore.stageDisplayName(targetStage)}模块需要更新。选择操作方式：`,
         '数据已变更',
         {
-          confirmButtonText: '继续',
-          cancelButtonText: '取消',
+          confirmButtonText: '重新执行',
+          cancelButtonText: '保持现状',
+          distinguishCancelAndClose: true,
           type: 'warning',
         },
       )
-      // 用户确认：清除脏标记后导航
-      await pipelineStore.clearDirtyFlag(projectId, targetStage)
-    } catch {
-      // 用户取消：不做任何操作
-      return
+      // 用户选择"重新执行"：推进阶段并触发重新生成
+      await pipelineStore.advanceStage(projectId, targetStage, true)
+    } catch (action) {
+      if (action === 'cancel') {
+        // 用户选择"保持现状"：清除脏标记后导航
+        await pipelineStore.clearDirtyFlag(projectId, targetStage)
+      } else {
+        // 用户关闭对话框：不做任何操作
+        return
+      }
     }
   }
 

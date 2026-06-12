@@ -131,7 +131,7 @@ public class FFmpegUtils {
         command.add("-i");
         command.add(videoPath);
         command.add("-vf");
-        command.add("subtitles='" + escapedSrt + "'");
+        command.add("subtitles=" + escapedSrt);
         command.add("-c:a");
         command.add("copy");
         command.add(outputPath);
@@ -218,7 +218,7 @@ public class FFmpegUtils {
                         duration, videoDuration - duration, duration);
                 break;
             case "zoom":
-                filter = String.format("zoompan=z='min(zoom+0.0015,1.5)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=iwxih:fps=30,fade=t=in:st=0:d=%.2f,fade=t=out:st=%.2f:d=%.2f",
+                filter = String.format("zoompan=z='min(zoom+0.0015,1.5)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=iw*ih:fps=30,fade=t=in:st=0:d=%.2f,fade=t=out:st=%.2f:d=%.2f",
                         duration, videoDuration - duration, duration);
                 break;
             default:
