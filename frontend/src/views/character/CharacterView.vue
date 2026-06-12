@@ -129,10 +129,12 @@ import { ref, onMounted, computed } from 'vue'
 import { Plus, Loading, User } from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus'
 import { useProjectStore } from '@/stores/project'
+import { useScriptStore } from '@/stores/script'
 import { useCharacterStore } from '@/stores/character'
 import type { Character, CharacterRole, Gender } from '@/types'
 
 const projectStore = useProjectStore()
+const scriptStore = useScriptStore()
 const charStore = useCharacterStore()
 
 const showCreateDialog = ref(false)
@@ -200,9 +202,18 @@ async function handleDeleteCharacter(id: number) {
 }
 
 async function handleExtractCharacters() {
-  if (!projectStore.currentProject?.currentEpisodeId) return
-  // Use the first script for now
-  await charStore.extractCharacters(1) // TODO: get actual scriptId
+  if (!projectId.value) return
+  // 确保有当前剧本，如果没有则加载项目的剧本列表并选择第一个
+  let scriptId = scriptStore.currentScript?.id
+  if (!scriptId) {
+    await scriptStore.fetchScripts(projectId.value)
+    if (scriptStore.scripts.length > 0) {
+      await scriptStore.selectScript(scriptStore.scripts[0].id!)
+      scriptId = scriptStore.currentScript?.id
+    }
+  }
+  if (!scriptId) return
+  await charStore.extractCharacters(scriptId)
 }
 
 async function handleConfirmAsset(assetId: number) {
