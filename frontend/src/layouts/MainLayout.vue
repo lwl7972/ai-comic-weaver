@@ -29,10 +29,10 @@
       <el-aside width="200px" class="layout-sidebar">
         <el-menu
           :default-active="currentRoute"
-          router
           background-color="#1a1a2e"
           text-color="#a0a0b8"
           active-text-color="#818cf8"
+          @select="handleMenuSelect"
         >
           <el-menu-item index="/project">
             <el-icon><FolderOpened /></el-icon>
@@ -40,27 +40,33 @@
           </el-menu-item>
           <el-menu-item index="/script">
             <el-icon><Document /></el-icon>
-            <span>📝 剧本</span>
+            <span>剧本</span>
+            <span v-if="pipelineStore.isScriptDirty" class="dirty-dot" />
           </el-menu-item>
           <el-menu-item index="/character">
             <el-icon><UserFilled /></el-icon>
-            <span>🎭 角色</span>
+            <span>角色</span>
+            <span v-if="pipelineStore.isCharacterDirty" class="dirty-dot" />
           </el-menu-item>
           <el-menu-item index="/scene">
             <el-icon><PictureFilled /></el-icon>
-            <span>🌄 场景</span>
+            <span>场景</span>
+            <span v-if="pipelineStore.isSceneDirty" class="dirty-dot" />
           </el-menu-item>
           <el-menu-item index="/storyboard">
             <el-icon><Film /></el-icon>
-            <span>🎬 分镜</span>
+            <span>分镜</span>
+            <span v-if="pipelineStore.isStoryboardDirty" class="dirty-dot" />
           </el-menu-item>
           <el-menu-item index="/director">
             <el-icon><VideoCamera /></el-icon>
-            <span>🎥 导演</span>
+            <span>导演</span>
+            <span v-if="pipelineStore.isDirectorDirty" class="dirty-dot" />
           </el-menu-item>
           <el-menu-item index="/s-level">
             <el-icon><Star /></el-icon>
-            <span>⭐ S级</span>
+            <span>S级</span>
+            <span v-if="pipelineStore.isOutputDirty" class="dirty-dot" />
           </el-menu-item>
           <el-divider border-style="dashed" />
           <el-menu-item index="/config">
@@ -84,17 +90,74 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { ElMessageBox } from 'element-plus'
 import sseClient from '@/utils/sse'
 import { useNotificationStore } from '@/stores/notification'
+import { usePipelineStore } from '@/stores/pipeline'
+import { useProjectStore } from '@/stores/project'
+import type { PipelineStage } from '@/types'
 import {
   Document, UserFilled, PictureFilled, Film,
   VideoCamera, Star, FolderOpened, Setting,
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
+const router = useRouter()
 const currentRoute = computed(() => route.path)
 const notificationStore = useNotificationStore()
+const pipelineStore = usePipelineStore()
+const projectStore = useProjectStore()
+
+/** 路由路径 -> 流水线阶段映射 */
+const stageMap: Record<string, PipelineStage> = {
+  '/script': 'SCRIPT',
+  '/character': 'CHARACTER',
+  '/scene': 'SCENE',
+  '/storyboard': 'STORYBOARD',
+  '/director': 'DIRECTOR',
+  '/s-level': 'OUTPUT',
+}
+
+/** 菜单选择处理 - DIRTY 拦截 */
+async function handleMenuSelect(index: string) {
+  const targetStage = stageMap[index]
+
+  // 非流水线模块（项目管理、配置中心）直接导航
+  if (!targetStage) {
+    router.push(index)
+    return
+  }
+
+  // 无当前项目时直接导航（流水线状态需要项目上下文）
+  const projectId = projectStore.currentProject?.id
+  if (!projectId) {
+    router.push(index)
+    return
+  }
+
+  // 检查目标模块是否有脏标记
+  if (pipelineStore.isStageDirty(targetStage)) {
+    try {
+      await ElMessageBox.confirm(
+        `上游数据已变更，${pipelineStore.stageDisplayName(targetStage)}模块可能需要重新执行。是否继续？`,
+        '数据已变更',
+        {
+          confirmButtonText: '继续',
+          cancelButtonText: '取消',
+          type: 'warning',
+        },
+      )
+      // 用户确认：清除脏标记后导航
+      await pipelineStore.clearDirtyFlag(projectId, targetStage)
+    } catch {
+      // 用户取消：不做任何操作
+      return
+    }
+  }
+
+  router.push(index)
+}
 
 const pipelineActiveStep = computed(() => {
   const stepMap: Record<string, number> = {
@@ -213,5 +276,22 @@ onUnmounted(() => {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+/* DIRTY 橙色圆点指示 */
+.dirty-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #e6a23c;
+  margin-left: 6px;
+  box-shadow: 0 0 4px rgba(230, 162, 60, 0.6);
+  animation: dirty-pulse 2s ease-in-out infinite;
+}
+
+@keyframes dirty-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 </style>
