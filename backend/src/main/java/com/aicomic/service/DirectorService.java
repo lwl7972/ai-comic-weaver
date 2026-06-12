@@ -3,6 +3,7 @@ package com.aicomic.service;
 import com.aicomic.common.exception.ResourceNotFoundException;
 import com.aicomic.entity.Character;
 import com.aicomic.entity.Episode;
+import com.aicomic.entity.Project;
 import com.aicomic.entity.Scene;
 import com.aicomic.entity.Storyboard;
 import com.aicomic.repository.StoryboardRepository;
@@ -33,6 +34,7 @@ public class DirectorService {
     private final ModelCallService modelCallService;
     private final ReferenceResolutionService refService;
     private final SseService sseService;
+    private final PipelineStateService pipelineStateService;
 
     /**
      * 生成整集视频（异步执行）
@@ -102,6 +104,8 @@ public class DirectorService {
             sb.setGeneratedVideoUrl(videoUrl);
             sb.setStatus(Storyboard.StoryboardStatus.VIDEO_DONE);
             storyboardRepository.save(sb);
+
+            pipelineStateService.markDirty(projectId, Project.PipelineStage.DIRECTOR);
 
             sseService.pushNotification("director-progress",
                     String.format("分镜 #%d 视频生成完成", sb.getSequence() + 1));
@@ -215,6 +219,13 @@ public class DirectorService {
                     sb.setStatus(Storyboard.StoryboardStatus.VIDEO_DONE);
                 }
                 storyboardRepository.saveAll(storyboards);
+
+                // Mark director dirty
+                Long projectId = refService.resolveProjectIdFromStoryboard(storyboards.get(0));
+                if (projectId != null) {
+                    pipelineStateService.markDirty(projectId, Project.PipelineStage.DIRECTOR);
+                }
+
                 return true;
             }
         } catch (ModelCallException e) {
@@ -256,6 +267,8 @@ public class DirectorService {
             sb.setGeneratedVideoUrl(videoUrl);
             sb.setStatus(Storyboard.StoryboardStatus.VIDEO_DONE);
             storyboardRepository.save(sb);
+
+            pipelineStateService.markDirty(projectId, Project.PipelineStage.DIRECTOR);
 
             sseService.pushNotification("director-progress",
                     String.format("分镜 #%d 视频生成完成", sb.getSequence() + 1));
