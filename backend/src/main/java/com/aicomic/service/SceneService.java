@@ -102,7 +102,7 @@ public class SceneService {
 
             sseService.pushNotification("scene-progress", "AI 正在提取场景信息...");
 
-            String prompt = buildSceneExtractionPrompt(scriptContent);
+            String prompt = buildSceneExtractionPromptWithTemplate(scriptContent);
             String result = modelCallService.callText(ModelConfig.ModelType.TEXT, prompt);
 
             List<ExtractedAsset> assets = parseExtractedScenes(result, projectId);
@@ -458,4 +458,28 @@ public class SceneService {
             default: return "";
         }
     }
+
+    // ==================== Template-based Prompt Generation ====================
+
+    /**
+     * 构建场景提取提示词（使用模板）
+     */
+    private String buildSceneExtractionPromptWithTemplate(String scriptContent) {
+        try {
+            var templateOpt = promptTemplateService.getTemplateByName(
+                PromptTemplate.TemplateCategory.SCENE, "场景提取");
+            if (templateOpt.isPresent()) {
+                var template = templateOpt.get();
+                java.util.Map<String, String> variables = new java.util.HashMap<>();
+                variables.put("scriptContent", scriptContent.length() > 30000 ? 
+                    scriptContent.substring(0, 30000) + "
+...(content truncated)" : scriptContent);
+                return promptTemplateService.renderTemplate(template.getId(), variables);
+            }
+        } catch (Exception e) {
+            log.warn("模板渲染失败，使用硬编码提示词：{}", e.getMessage());
+        }
+        return buildSceneExtractionPromptWithTemplate(scriptContent);
+    }
+
 }
