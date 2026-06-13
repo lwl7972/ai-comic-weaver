@@ -114,7 +114,7 @@ public class StoryboardService {
             sseService.pushNotification("storyboard-progress",
                     String.format("正在解析第%s集剧本为分镜数据...", episode.getEpisodeNumber()));
 
-            String prompt = buildStoryboardParsePrompt(episode);
+            String prompt = buildStoryboardParsePromptWithTemplate(episode);
             String result = modelCallService.callText(ModelConfig.ModelType.TEXT, prompt);
 
             List<Storyboard> storyboards = parseStoryboardResult(result, episodeId);
@@ -210,7 +210,7 @@ public class StoryboardService {
 
                     // 预解析 projectId，避免后续多次反查
                     Long projectId = refService.resolveProjectIdFromStoryboard(sb);
-                    String imagePrompt = buildStoryboardImagePrompt(sb, projectId);
+                    String imagePrompt = buildStoryboardImagePromptWithTemplate(sb, projectId);
                     List<String> refUrls = refService.collectReferenceImageUrls(sb, projectId);
                     String referenceImageUrl = refUrls.isEmpty() ? null : refUrls.get(0);
                     String imageUrl = modelCallService.callImage(imagePrompt, referenceImageUrl, null);
@@ -262,7 +262,7 @@ public class StoryboardService {
             storyboardRepository.save(sb);
 
             Long projectId = refService.resolveProjectIdFromStoryboard(sb);
-            String imagePrompt = buildStoryboardImagePrompt(sb, projectId);
+            String imagePrompt = buildStoryboardImagePromptWithTemplate(sb, projectId);
             List<String> refUrls = refService.collectReferenceImageUrls(sb, projectId);
             String referenceImageUrl = refUrls.isEmpty() ? null : refUrls.get(0);
             String imageUrl = modelCallService.callImage(imagePrompt, referenceImageUrl, null);
@@ -567,5 +567,62 @@ public class StoryboardService {
             pipelineStateService.markDirty(projectId, Project.PipelineStage.STORYBOARD);
         }
         return saved;
+
+    // ==================== Template-based Prompt Generation ====================
+
+    /**
+     * 构建分镜解析提示词（使用模板）
+     */
+    private String buildStoryboardParsePromptWithTemplate(Episode episode) {
+        try {
+            var templateOpt = promptTemplateService.getTemplateByName(
+                PromptTemplate.TemplateCategory.STORYBOARD, "分镜解析");
+            if (templateOpt.isPresent()) {
+                var template = templateOpt.get();
+                java.util.Map<String, String> variables = new java.util.HashMap<>();
+                variables.put("sceneContent", "第" + episode.getEpisodeNumber() + "集：" + episode.getTitle() + "
+" + episode.getScriptContent());
+                variables.put("characters", "待提取");
+                return promptTemplateService.renderTemplate(template.getId(), variables);
+            }
+        } catch (Exception e) {
+            log.warn("模板渲染失败，使用硬编码提示词：{}", e.getMessage());
+        }
+        return buildStoryboardParsePromptWithTemplate(episode);
+    }
+
+    /**
+     * 构建分镜图生成提示词（使用模板）
+     */
+    private String buildStoryboardImagePromptWithTemplate(Storyboard sb, Long projectId) {
+        try {
+            var templateOpt = promptTemplateService.getTemplateByName(
+                PromptTemplate.TemplateCategory.STORYBOARD, "分镜图生成提示词");
+            if (templateOpt.isPresent()) {
+                var template = templateOpt.get();
+                java.util.Map<String, String> variables = new java.util.HashMap<>();
+                variables.put("action", sb.getAction());
+
+                // 构建角色列表
+                List<Character> characters = refService.resolveInvolvedCharacters(sb, projectId);
+                List<String> charNames = characters.stream()
+                    .map(Character::getName)
+                    .collect(java.util.stream.Collectors.toList());
+                variables.put("characters", charNames.isEmpty() ? "待补充" : String.join(", ", charNames));
+
+                variables.put("scene", sb.getInvolvedSceneName());
+                variables.put("emotion", sb.getEmotion());
+                variables.put("shotSize", sb.getShotSize() != null ? sb.getShotSize().toString() : "MEDIUM");
+                variables.put("cameraAngle", sb.getCameraAngle() != null ? sb.getCameraAngle().toString() : "EYE_LEVEL");
+                variables.put("cameraMovement", sb.getCameraMovement() != null ? sb.getCameraMovement().toString() : "STATIC");
+
+                return promptTemplateService.renderTemplate(template.getId(), variables);
+            }
+        } catch (Exception e) {
+            log.warn("模板渲染失败，使用硬编码提示词：{}", e.getMessage());
+        }
+        return buildStoryboardImagePromptWithTemplate(sb, projectId);
+    }
+
     }
 }
