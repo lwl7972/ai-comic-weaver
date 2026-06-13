@@ -155,7 +155,7 @@ function handleLanguageCommand(command: string) {
 
 /** 打开 GitHub 仓库 */
 function openGitHub() {
-  window.open('https://gitee.com/aiprojects_1/ai-comic-weaver', '_blank')
+  window.open('https://github.com/lwl7972/ai-comic-weaver', '_blank')
 }
 
 /** 菜单选择处理 - DIRTY 拦截 */

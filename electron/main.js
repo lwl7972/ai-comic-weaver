@@ -60,7 +60,7 @@ function createWindow() {
 }
 
 /**
- * 创建应用菜单栏（包含 Gitee/GitHub 跳转）
+ * 创建应用菜单栏（包含 GitHub 跳转）
  */
 function createApplicationMenu() {
   const isMac = process.platform === 'darwin'
@@ -69,15 +69,15 @@ function createApplicationMenu() {
     label: '帮助',
     submenu: [
       {
-        label: 'Gitee 仓库',
+        label: 'GitHub 仓库',
         click: () => {
-          shell.openExternal('https://gitee.com/aiprojects_1/ai-comic-weaver')
+          shell.openExternal('https://github.com/lwl7972/ai-comic-weaver')
         },
       },
       {
-        label: 'GitHub 镜像',
+        label: 'Releases',
         click: () => {
-          shell.openExternal('https://github.com/lwl7972/ai-comic-weaver')
+          shell.openExternal('https://github.com/lwl7972/ai-comic-weaver/releases')
         },
       },
       { type: 'separator' },
