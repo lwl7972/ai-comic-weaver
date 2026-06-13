@@ -140,9 +140,33 @@ public class DirectorService {
      */
     public String concatVideoFragments(List<String> fragmentUrls) {
         if (fragmentUrls == null || fragmentUrls.isEmpty()) {
-            log.warn("FFmpeg 拼接跳过: 视频片段列表为空");
+            log.warn("FFmpeg 拼接跳过：视频片段列表为空");
             return null;
         }
+        log.info("开始 FFmpeg 拼接：fragmentCount={}", fragmentUrls.size());
+        sseService.pushNotification("director-progress",
+                String.format("正在用 FFmpeg 拼接 %d 个视频片段...", fragmentUrls.size()));
+        try {
+            Path workDir = Files.createTempDirectory("ffmpeg_concat_");
+            String outputPath = workDir + "/concat_result.mp4";
+            FFmpegUtils.FFmpegResult result = ffmpegUtils.concatVideos(fragmentUrls, outputPath);
+            
+            if (result.getExitCode() == 0) {
+                log.info("FFmpeg 拼接完成：{}", outputPath);
+                sseService.pushNotification("director-completed", 
+                        String.format("FFmpeg 拼接成功！共 %d 个片段", fragmentUrls.size()));
+                return outputPath;
+            } else {
+                log.error("FFmpeg 拼接失败：{}", result.getOutput());
+                sseService.pushNotification("director-error", "FFmpeg 拼接失败：" + result.getOutput());
+                return null;
+            }
+        } catch (Exception e) {
+            log.error("FFmpeg 拼接失败：{}", e.getMessage(), e);
+            sseService.pushNotification("director-error", "FFmpeg 拼接失败：" + e.getMessage());
+            return null;
+        }
+    }
         log.info("开始 FFmpeg 拼接: fragmentCount={}", fragmentUrls.size());
         sseService.pushNotification("director-progress",
                 String.format("正在用 FFmpeg 拼接 %d 个视频片段...", fragmentUrls.size()));
@@ -550,10 +574,16 @@ public class DirectorService {
     }
 
     /**
-     * 逐镜头顺序生成（支持进度更新）
+     * 逐镜头顺序生成（支持进度更新和失败阈值控制）
+     * 当失败率超过 50% 时停止生成，避免资源浪费
      */
     private void generateAllShotsSequentially(List<Storyboard> storyboards, VideoGenerationTask task) {
         log.info("开始逐镜头生成：totalShots={}", storyboards.size());
+
+        int totalShots = storyboards.size();
+        int failureCount = 0;
+        int successCount = 0;
+        final int FAILURE_THRESHOLD = 50; // 失败率阈值（%）
 
         for (int i = 0; i < storyboards.size(); i++) {
             Storyboard sb = storyboards.get(i);
@@ -562,7 +592,22 @@ public class DirectorService {
                 break;
             }
 
-            log.info("生成第 {} 个镜头/共 {}", i + 1, storyboards.size());
+            // 检查失败率是否超过阈值
+            int currentTotal = successCount + failureCount;
+            if (currentTotal > 0) {
+                int currentFailureRate = (failureCount * 100) / currentTotal;
+                if (currentFailureRate >= FAILURE_THRESHOLD && i >= 2) {
+                    log.warn("失败率已达 {}% (阈值 {}%)，停止生成：success={}, failure={}", 
+                            currentFailureRate, FAILURE_THRESHOLD, successCount, failureCount);
+                    sseService.pushNotification("director-error", 
+                            String.format("失败率过高 (%d%%)，已停止生成。成功：%d, 失败：%d", 
+                                    currentFailureRate, successCount, failureCount));
+                    task.markFailed("失败率过高：" + currentFailureRate + "%");
+                    break;
+                }
+            }
+
+            log.info("生成第 {} 个镜头/共 {} (成功={}, 失败={})", i + 1, storyboards.size(), successCount, failureCount);
             int progress = 30 + (i * 50 / storyboards.size());
             task.updateProgress(progress);
 
@@ -578,13 +623,29 @@ public class DirectorService {
                 storyboardRepository.save(sb);
 
                 pipelineStateService.markDirty(projectId, Project.PipelineStage.DIRECTOR);
+                successCount++;
 
             } catch (ModelCallException e) {
                 log.error("分镜 #{} 生成失败：{}", sb.getSequence() + 1, e.getMessage());
                 sb.setStatus(Storyboard.StoryboardStatus.ERROR);
                 storyboardRepository.save(sb);
-                // 继续生成下一个镜头
+                failureCount++;
+                sseService.pushNotification("director-error", 
+                        String.format("分镜 #%d 生成失败：%s", sb.getSequence() + 1, e.getMessage()));
+                // 继续生成下一个镜头（除非达到失败阈值）
             }
+        }
+
+        // 生成完成后的统计
+        log.info("逐镜头生成完成：total={}, success={}, failure={}, failureRate={}%", 
+                totalShots, successCount, failureCount, 
+                totalShots > 0 ? (failureCount * 100) / totalShots : 0);
+
+        if (successCount > 0 && failureCount < totalShots) {
+            sseService.pushNotification("director-completed", 
+                    String.format("生成完成：成功 %d/%d 镜头", successCount, totalShots));
+        } else if (failureCount == totalShots) {
+            task.markFailed("全部镜头生成失败");
         }
     }
 }
