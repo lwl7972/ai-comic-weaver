@@ -2,6 +2,7 @@ package com.aicomic.service;
 
 import com.aicomic.common.util.FFmpegUtils;
 import com.aicomic.common.exception.ResourceNotFoundException;
+import com.aicomic.dto.VideoGenerationRequest;
 import com.aicomic.entity.Character;
 import com.aicomic.entity.Episode;
 import com.aicomic.entity.Project;
@@ -11,6 +12,9 @@ import com.aicomic.repository.StoryboardRepository;
 import com.aicomic.repository.EpisodeRepository;
 import com.aicomic.service.model.ModelCallException;
 import com.aicomic.service.model.ModelCallService;
+import com.aicomic.service.queue.VideoGenerationTask;
+import com.aicomic.service.queue.VideoTaskQueueManager;
+import com.aicomic.service.queue.VideoGenerationTask.Priority;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -39,6 +43,7 @@ public class DirectorService {
     private final SseService sseService;
     private final PipelineStateService pipelineStateService;
     private final FFmpegUtils ffmpegUtils;
+    private final VideoTaskQueueManager queueManager;
 
     /**
      * 生成整集视频（异步执行）
@@ -356,10 +361,100 @@ public class DirectorService {
             case TILT_DOWN: return "tilt down";
             case ZOOM_IN: return "zoom in";
             case ZOOM_OUT: return "zoom out";
+            case DOLLY_IN: return "dolly in";
+            case DOLLY_OUT: return "dolly out";
             case TRACKING: return "tracking shot";
             case CRANE: return "crane shot";
-            case HANDHELD: return "handheld camera";
+            case ORBIT: return "orbit shot";
             default: return "";
         }
+    }
+
+    // ==================== 视频队列管理 ====================
+
+    /**
+     * 提交自定义参数的视频生成任务
+     */
+    public VideoGenerationRequest submitVideoGeneration(VideoGenerationRequest request) {
+        videoTaskQueueManager.start();
+        
+        Priority priority = Priority.MEDIUM;
+        if (request.getPriority() != null) {
+            try {
+                priority = Priority.valueOf(request.getPriority().toUpperCase());
+            } catch (IllegalArgumentException e) {
+                log.warn("无效优先级：{}, 使用默认值 MEDIUM", request.getPriority());
+            }
+        }
+
+        VideoGenerationTask task;
+        if ("SINGLE_SHOT".equalsIgnoreCase(request.getGenerationMode())) {
+            task = new VideoGenerationTask(request.getEpisodeId(), priority);
+        } else {
+            task = new VideoGenerationTask(
+                request.getProjectId(), 
+                request.getEpisodeId(), 
+                VideoGenerationTask.TaskType.FULL_EPISODE,
+                priority
+            );
+        }
+
+        queueManager.submitTask(task);
+        request.setTaskId(task.getTaskId());
+        
+        log.info("已提交视频生成任务：taskId={}, mode={}, priority={}", 
+                task.getTaskId(), request.getGenerationMode(), priority);
+        
+        return request;
+    }
+
+    /**
+     * 暂停视频生成队列
+     */
+    public void pauseQueue() {
+        queueManager.pause();
+        sseService.pushNotification("director-queue", "视频生成队列已暂停");
+    }
+
+    /**
+     * 恢复视频生成队列
+     */
+    public void resumeQueue() {
+        queueManager.resume();
+        sseService.pushNotification("director-queue", "视频生成队列已恢复");
+    }
+
+    /**
+     * 取消视频生成任务
+     */
+    public boolean cancelTask(String taskId) {
+        boolean cancelled = queueManager.cancelTask(taskId);
+        if (cancelled) {
+            sseService.pushNotification("director-task-cancelled", "任务已取消：" + taskId);
+        }
+        return cancelled;
+    }
+
+    /**
+     * 获取队列状态
+     */
+    public VideoTaskQueueManager.QueueStats getQueueStats() {
+        return queueManager.getQueueStats();
+    }
+
+    /**
+     * 获取任务详情
+     */
+    public VideoGenerationTask getTaskInfo(String taskId) {
+        return queueManager.getTask(taskId);
+    }
+
+    /**
+     * 获取所有任务列表
+     */
+    public List<VideoGenerationTask> getAllTasks() {
+        return queueManager.getAllTasks();
+    }
+}
     }
 }

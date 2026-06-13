@@ -8,11 +8,17 @@ import lombok.Data;
 @Data
 public class VideoGenerationRequest {
 
+    /** 任务 ID（生成后返回） */
+    private String taskId;
+
     /** 项目 ID */
     private Long projectId;
 
     /** 剧集 ID */
     private Long episodeId;
+
+    /** 分镜 ID（单镜头生成时使用） */
+    private Long storyboardId;
 
     /** 生成模式：FULL_EPISODE(整集) / SINGLE_SHOT(单镜头) */
     private String generationMode;
