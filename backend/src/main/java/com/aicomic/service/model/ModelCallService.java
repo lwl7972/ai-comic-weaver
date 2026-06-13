@@ -178,9 +178,74 @@ public class ModelCallService {
      */
     public CozeWorkflowResponse pollCozeWorkflow(String runId, Long modelConfigId) {
         ModelConfig config = modelConfigService.getDecryptedConfig(modelConfigId)
-                .orElseThrow(() -> new ModelCallException("模型配置不存在: " + modelConfigId));
+                .orElseThrow(() -> new ModelCallException("模型配置不存在：" + modelConfigId));
         ModelProvider provider = resolveProvider(config);
         return provider.pollWorkflowResult(runId, config);
+    }
+
+    /**
+     * 同步轮询扣子工作流结果（带超时和重试）
+     *
+     * @param workflowId 工作流 ID
+     * @param parameters 参数（JSON 字符串）
+     * @param modelConfigId 模型配置 ID
+     * @param timeoutMs 超时时间（毫秒）
+     * @param pollIntervalMs 轮询间隔（毫秒）
+     * @return 工作流输出
+     */
+    public String pollCozeWorkflowSync(
+            String workflowId,
+            String parameters,
+            Long modelConfigId,
+            long timeoutMs,
+            long pollIntervalMs
+    ) {
+        log.info("开始同步轮询扣子工作流：workflowId={}, timeout={}ms", workflowId, timeoutMs);
+
+        // 1. 提交工作流
+        String runId = submitCozeWorkflow(workflowId, parameters, modelConfigId);
+        log.info("工作流已提交：runId={}", runId);
+
+        // 2. 轮询结果
+        long startTime = System.currentTimeMillis();
+        long elapsed = 0;
+
+        while (elapsed < timeoutMs) {
+            try {
+                CozeWorkflowResponse response = pollCozeWorkflow(runId, modelConfigId);
+
+                if (!response.isSuccess()) {
+                    throw new ModelCallException("工作流执行失败：" + response.getErrorMessage());
+                }
+
+                if ("COMPLETED".equals(response.getStatus())) {
+                    log.info("工作流执行完成：runId={}, output={}", runId, response.getOutput());
+                    return response.getOutput();
+                }
+
+                if ("FAILED".equals(response.getStatus())) {
+                    throw new ModelCallException("工作流执行失败：" + response.getErrorMessage());
+                }
+
+                // 继续轮询
+                log.debug("工作流执行中：runId={}, status={}, 已耗时={}ms", runId, response.getStatus(), elapsed);
+                Thread.sleep(pollIntervalMs);
+                elapsed = System.currentTimeMillis() - startTime;
+
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new ModelCallException("工作流轮询被中断", e);
+            }
+        }
+
+        throw new ModelCallException("工作流执行超时：" + elapsed + "ms > " + timeoutMs + "ms");
+    }
+
+    /**
+     * 同步轮询扣子工作流结果（使用默认配置：10 分钟超时，3 秒间隔）
+     */
+    public String pollCozeWorkflowSync(String workflowId, String parameters, Long modelConfigId) {
+        return pollCozeWorkflowSync(workflowId, parameters, modelConfigId, 10 * 60 * 1000, 3000);
     }
 
     // ==================== 内部方法 ====================

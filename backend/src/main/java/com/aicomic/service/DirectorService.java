@@ -45,6 +45,11 @@ public class DirectorService {
     private final FFmpegUtils ffmpegUtils;
     private final VideoTaskQueueManager queueManager;
 
+    @jakarta.annotation.PostConstruct
+    public void init() {
+        queueManager.setDirectorService(this);
+    }
+
     /**
      * 生成整集视频（异步执行）
      * 优先一次生成整集，不支持时回退逐镜头 + FFmpeg 拼接
@@ -455,6 +460,131 @@ public class DirectorService {
     public List<VideoGenerationTask> getAllTasks() {
         return queueManager.getAllTasks();
     }
-}
+
+    /**
+     * 执行单镜头视频生成（由队列管理器调用）
+     */
+    public void executeShotGeneration(Long storyboardId, VideoGenerationTask task) {
+        log.info("队列执行单镜头视频生成：storyboardId={}, taskId={}", storyboardId, task.getTaskId());
+        Storyboard sb = storyboardRepository.findById(storyboardId)
+                .orElseThrow(() -> new ResourceNotFoundException("分镜", storyboardId));
+
+        try {
+            sseService.pushNotification("director-progress",
+                    String.format("正在生成分镜 #%d 的视频...", sb.getSequence() + 1));
+
+            sb.setStatus(Storyboard.StoryboardStatus.VIDEO_GENERATING);
+            storyboardRepository.save(sb);
+            task.updateProgress(10);
+
+            Long projectId = refService.resolveProjectIdFromStoryboard(sb);
+            String videoPrompt = buildVideoPrompt(sb, projectId);
+            String referenceImage = sb.getGeneratedImageUrl();
+
+            task.updateProgress(30);
+
+            String videoUrl = modelCallService.callVideo(videoPrompt, referenceImage, null);
+
+            sb.setGeneratedVideoUrl(videoUrl);
+            sb.setStatus(Storyboard.StoryboardStatus.VIDEO_DONE);
+            storyboardRepository.save(sb);
+            task.updateProgress(80);
+
+            pipelineStateService.markDirty(projectId, Project.PipelineStage.DIRECTOR);
+
+            sseService.pushNotification("director-progress",
+                    String.format("分镜 #%d 视频生成完成", sb.getSequence() + 1));
+
+            task.markCompleted(videoUrl);
+            log.info("单镜头视频生成完成：storyboardId={}, taskId={}", storyboardId, task.getTaskId());
+
+        } catch (ModelCallException e) {
+            log.error("单镜头视频生成失败：{}", e.getMessage(), e);
+            sb.setStatus(Storyboard.StoryboardStatus.ERROR);
+            storyboardRepository.save(sb);
+            task.markFailed("视频生成失败：" + e.getMessage());
+            sseService.pushNotification("director-error",
+                    String.format("分镜 #%d 视频生成失败：%s", sb.getSequence() + 1, e.getMessage()));
+            throw new RuntimeException("视频生成失败", e);
+        }
+    }
+
+    /**
+     * 执行整集视频生成（由队列管理器调用）
+     */
+    public void executeEpisodeGeneration(Long episodeId, VideoGenerationTask task) {
+        log.info("队列执行整集视频生成：episodeId={}, taskId={}", episodeId, task.getTaskId());
+        Episode episode = episodeRepository.findById(episodeId)
+                .orElseThrow(() -> new ResourceNotFoundException("剧集", episodeId));
+
+        List<Storyboard> storyboards = storyboardRepository.findByEpisodeIdOrderBySequenceAsc(episodeId);
+        if (storyboards.isEmpty()) {
+            sseService.pushNotification("director-error", "没有找到分镜数据");
+            task.markFailed("没有分镜数据");
+            throw new RuntimeException("没有分镜数据");
+        }
+
+        try {
+            sseService.pushNotification("director-progress",
+                    String.format("正在生成第%s集视频...", episode.getEpisodeNumber()));
+            task.updateProgress(10);
+
+            boolean fullSuccess = tryFullEpisodeGeneration(episode, storyboards);
+
+            if (!fullSuccess) {
+                sseService.pushNotification("director-progress", "整集生成不支持，切换到逐镜头模式...");
+                generateAllShotsSequentially(storyboards, task);
+            }
+
+            sseService.pushNotification("director-completed",
+                    String.format("第%s集视频生成完成", episode.getEpisodeNumber()));
+            task.markCompleted(storyboards.get(0).getGeneratedVideoUrl());
+            log.info("整集视频生成完成：episodeId={}, taskId={}", episodeId, task.getTaskId());
+
+        } catch (ModelCallException e) {
+            log.error("视频生成失败：{}", e.getMessage(), e);
+            task.markFailed("视频生成失败：" + e.getMessage());
+            sseService.pushNotification("director-error", "视频生成失败：" + e.getMessage());
+            throw new RuntimeException("视频生成失败", e);
+        }
+    }
+
+    /**
+     * 逐镜头顺序生成（支持进度更新）
+     */
+    private void generateAllShotsSequentially(List<Storyboard> storyboards, VideoGenerationTask task) {
+        log.info("开始逐镜头生成：totalShots={}", storyboards.size());
+
+        for (int i = 0; i < storyboards.size(); i++) {
+            Storyboard sb = storyboards.get(i);
+            if (task.isCancelled()) {
+                log.info("任务已取消，停止生成：taskId={}", task.getTaskId());
+                break;
+            }
+
+            log.info("生成第 {} 个镜头/共 {}", i + 1, storyboards.size());
+            int progress = 30 + (i * 50 / storyboards.size());
+            task.updateProgress(progress);
+
+            try {
+                Long projectId = refService.resolveProjectIdFromStoryboard(sb);
+                String videoPrompt = buildVideoPrompt(sb, projectId);
+                String referenceImage = sb.getGeneratedImageUrl();
+
+                String videoUrl = modelCallService.callVideo(videoPrompt, referenceImage, null);
+
+                sb.setGeneratedVideoUrl(videoUrl);
+                sb.setStatus(Storyboard.StoryboardStatus.VIDEO_DONE);
+                storyboardRepository.save(sb);
+
+                pipelineStateService.markDirty(projectId, Project.PipelineStage.DIRECTOR);
+
+            } catch (ModelCallException e) {
+                log.error("分镜 #{} 生成失败：{}", sb.getSequence() + 1, e.getMessage());
+                sb.setStatus(Storyboard.StoryboardStatus.ERROR);
+                storyboardRepository.save(sb);
+                // 继续生成下一个镜头
+            }
+        }
     }
 }

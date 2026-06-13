@@ -1,5 +1,6 @@
 package com.aicomic.service.queue;
 
+import com.aicomic.service.DirectorService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -38,6 +39,9 @@ public class VideoTaskQueueManager {
     /** 队列管理器是否已启动 */
     private boolean started;
 
+    /** DirectorService 注入（延迟设置） */
+    private DirectorService directorService;
+
     public VideoTaskQueueManager() {
         this.taskQueue = new PriorityQueue<>(
                 Comparator.comparingInt(task -> -task.getPriority().getWeight())
@@ -49,6 +53,14 @@ public class VideoTaskQueueManager {
         this.maxConcurrentTasks = 2; // 最多同时执行 2 个视频生成任务
         this.scheduler = Executors.newSingleThreadScheduledExecutor();
         this.started = false;
+    }
+
+    /**
+     * 设置 DirectorService（在 Spring 初始化后由 DirectorService 调用）
+     */
+    public void setDirectorService(DirectorService directorService) {
+        this.directorService = directorService;
+        log.info("VideoTaskQueueManager 已绑定 DirectorService");
     }
 
     /**
@@ -158,8 +170,27 @@ public class VideoTaskQueueManager {
         // 创建异步执行
         CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
             try {
-                // 任务执行逻辑由调用方提供
-                // 这里仅做状态管理
+                if (directorService == null) {
+                    throw new IllegalStateException("DirectorService 未初始化");
+                }
+
+                // 根据任务类型执行不同的生成逻辑
+                if (task.getTaskType() == VideoGenerationTask.TaskType.SINGLE_SHOT) {
+                    // 单镜头生成
+                    if (task.getStoryboardId() != null) {
+                        directorService.executeShotGeneration(task.getStoryboardId(), task);
+                    } else {
+                        throw new IllegalArgumentException("单镜头任务必须指定 storyboardId");
+                    }
+                } else {
+                    // 整集生成
+                    if (task.getEpisodeId() != null) {
+                        directorService.executeEpisodeGeneration(task.getEpisodeId(), task);
+                    } else {
+                        throw new IllegalArgumentException("整集任务必须指定 episodeId");
+                    }
+                }
+
                 log.info("任务执行完成：taskId={}", task.getTaskId());
             } catch (Exception e) {
                 log.error("任务执行异常：taskId={}", task.getTaskId(), e);

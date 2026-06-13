@@ -1,5 +1,6 @@
 package com.aicomic.entity;
 
+import com.aicomic.common.util.CryptoUtils;
 import jakarta.persistence.*;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -46,10 +47,32 @@ public class ModelConfig {
     @Column(name = "api_url", nullable = false)
     private String apiUrl;
 
-    /** API Key (加密存储) */
-    @Column(name = "api_key", nullable = false)
-    @ToString.Exclude
-    private String apiKey;
+     /** API Key (加密存储) */
+     @Column(name = "api_key", nullable = false)
+     @ToString.Exclude
+     private String apiKeyEncrypted;
+
+     /**
+      * 获取 API Key 明文（自动解密）
+      */
+     @Transient
+     public String getApiKey() {
+         if (apiKeyEncrypted == null) {
+             return null;
+         }
+         return CryptoUtils.decrypt(apiKeyEncrypted);
+     }
+
+     /**
+      * 设置 API Key（自动加密）
+      */
+     public void setApiKey(String apiKey) {
+         if (apiKey == null) {
+             this.apiKeyEncrypted = null;
+         } else {
+             this.apiKeyEncrypted = CryptoUtils.encrypt(apiKey);
+         }
+     }
 
     /** 模型名称 (如 gpt-4o, claude-3.5-sonnet) */
     @Column(name = "model_name", nullable = false)

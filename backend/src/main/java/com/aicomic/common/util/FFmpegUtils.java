@@ -527,6 +527,137 @@ public class FFmpegUtils {
                 .replace("\\", "\\\\\\\\")
                 .replace("'", "\\\\'")
                 .replace(":", "\\\\:")
+                .replace("-", "\\-")
+                .replace("{", "\\{")
+                .replace("}", "\\}");
+    }
+
+    // ==================== 图片处理 ====================
+
+    /**
+     * 创建 N×N 网格图片拼接
+     *
+     * @param inputImages 输入图片 URL 列表（最多 9 张）
+     * @param outputPath 输出文件路径
+     * @param gridSize 网格大小（如 3 表示 3×3）
+     * @return 输出文件路径
+     */
+    public String createImageGrid(List<String> inputImages, String outputPath, int gridSize) {
+        if (inputImages == null || inputImages.isEmpty()) {
+            throw new IllegalArgumentException("输入图片列表为空");
+        }
+
+        if (inputImages.size() > gridSize * gridSize) {
+            log.warn("图片数量 {} 超过网格容量 {}×{}，仅使用前 {} 张", inputImages.size(), gridSize, gridSize, gridSize * gridSize);
+            inputImages = inputImages.subList(0, gridSize * gridSize);
+        }
+
+        log.info("开始创建 {}×{} 网格图片：图片数量={}", gridSize, gridSize, inputImages.size());
+
+        try {
+            // 计算需要的空白图片数量
+            int totalSlots = gridSize * gridSize;
+            int missingImages = totalSlots - inputImages.size();
+
+            // 构建 FFmpeg 命令
+            List<String> command = new ArrayList<>();
+            command.add(ffmpegPath);
+            command.add("-y"); // 覆盖输出
+
+            // 添加输入图片
+            for (String imageUrl : inputImages) {
+                command.add("-i");
+                command.add(imageUrl);
+            }
+
+            // 添加空白图片占位
+            for (int i = 0; i < missingImages; i++) {
+                command.add("-f");
+                command.add("lavfi");
+                command.add("-i");
+                command.add("color=c=black:s=1920x1080:d=1"); // 黑色占位图
+            }
+
+            // 构建 xstack 滤镜
+            StringBuilder filterComplex = new StringBuilder();
+            for (int i = 0; i < totalSlots; i++) {
+                if (i > 0) {
+                    filterComplex.append(";");
+                }
+                filterComplex.append("[").append(i).append(":0]scale=640:360[f").append(i).append("]");
+            }
+
+            // xstack 布局
+            filterComplex.append("[");
+            for (int i = 0; i < totalSlots; i++) {
+                if (i > 0) {
+                    filterComplex.append("][");
+                }
+                filterComplex.append("f").append(i);
+            }
+            filterComplex.append("]xstack=");
+
+            // 计算每个位置
+            int cellWidth = 640;
+            int cellHeight = 360;
+            int gap = 10; // 间隙
+            List<String> layouts = new ArrayList<>();
+            for (int row = 0; row < gridSize; row++) {
+                for (int col = 0; col < gridSize; col++) {
+                    int x = col * (cellWidth + gap);
+                    int y = row * (cellHeight + gap);
+                    layouts.add(x + "_" + y);
+                }
+            }
+            filterComplex.append("layout=").append(String.join("|", layouts));
+
+            command.add("-filter_complex");
+            command.add(filterComplex.toString());
+
+            // 输出参数
+            command.add("-q:v");
+            command.add("2"); // 高质量
+            command.add(outputPath);
+
+            log.info("FFmpeg 命令：{}", String.join(" ", command));
+
+            ProcessBuilder processBuilder = new ProcessBuilder(command);
+            processBuilder.redirectErrorStream(true);
+
+            Process process = processBuilder.start();
+            StringBuilder output = new StringBuilder();
+
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    output.append(line).append("\n");
+                }
+            }
+
+            boolean completed = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
+            if (!completed) {
+                process.destroyForcibly();
+                throw new RuntimeException("FFmpeg 执行超时");
+            }
+
+            int exitCode = process.exitValue();
+            if (exitCode != 0) {
+                log.error("FFmpeg 输出：{}", output.toString());
+                throw new RuntimeException("FFmpeg 执行失败，退出码：" + exitCode);
+            }
+
+            log.info("网格图片创建完成：{}", outputPath);
+            return outputPath;
+
+        } catch (IOException e) {
+            log.error("FFmpeg 执行失败", e);
+            throw new RuntimeException("FFmpeg 执行失败：" + e.getMessage(), e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("FFmpeg 执行被中断", e);
+        }
+    }
+}
                 .replace("%", "\\\\%");
     }
 }

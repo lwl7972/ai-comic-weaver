@@ -12,4 +12,6 @@ public interface EpisodeRepository extends JpaRepository<Episode, Long> {
     List<Episode> findByScriptIdOrderByEpisodeNumberAsc(Long scriptId);
 
     List<Episode> findByScriptIdAndStatus(Long scriptId, Episode.EpisodeStatus status);
+
+    List<Episode> findByProjectIdOrderByEpisodeNumberAsc(Long projectId);
 }
