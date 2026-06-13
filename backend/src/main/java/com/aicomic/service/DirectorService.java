@@ -147,18 +147,34 @@ public class DirectorService {
         sseService.pushNotification("director-progress",
                 String.format("正在用 FFmpeg 拼接 %d 个视频片段...", fragmentUrls.size()));
         try {
+            sseService.pushNotification("director-progress", "正在创建临时工作目录...");
             Path workDir = Files.createTempDirectory("ffmpeg_concat_");
+            
+            sseService.pushNotification("director-progress", "正在生成拼接列表文件...");
             String outputPath = workDir + "/concat_result.mp4";
+            
+            log.info("FFmpeg 参数：input={}, output={}", fragmentUrls.size(), outputPath);
             FFmpegUtils.FFmpegResult result = ffmpegUtils.concatVideos(fragmentUrls, outputPath);
             
             if (result.getExitCode() == 0) {
                 log.info("FFmpeg 拼接完成：{}", outputPath);
-                sseService.pushNotification("director-completed", 
-                        String.format("FFmpeg 拼接成功！共 %d 个片段", fragmentUrls.size()));
+                sseService.pushNotification("director-progress", "正在验证输出文件...");
+                
+                if (Files.exists(java.nio.file.Paths.get(outputPath))) {
+                    long fileSize = Files.size(java.nio.file.Paths.get(outputPath));
+                    String fileSizeStr = String.format("%.2f MB", fileSize / (1024.0 * 1024.0));
+                    sseService.pushNotification("director-completed", 
+                            String.format("FFmpeg 拼接成功！共 %d 个片段，文件大小：%s", 
+                                    fragmentUrls.size(), fileSizeStr));
+                    log.info("输出文件大小：{}", fileSizeStr);
+                }
+                
                 return outputPath;
             } else {
-                log.error("FFmpeg 拼接失败：{}", result.getOutput());
-                sseService.pushNotification("director-error", "FFmpeg 拼接失败：" + result.getOutput());
+                log.error("FFmpeg 拼接失败，exitCode={}, output={}", result.getExitCode(), result.getOutput());
+                sseService.pushNotification("director-error", 
+                        String.format("FFmpeg 拼接失败 (exit code: %d): %s", 
+                                result.getExitCode(), result.getOutput()));
                 return null;
             }
         } catch (Exception e) {

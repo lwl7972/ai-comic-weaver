@@ -351,16 +351,88 @@ public class SLevelService {
     }
 
     /**
-     * 解析timeRange获取时长（秒）
-     * 支持格式: "0-4s", "2-6s", "0-3.5s" 等
-     *
+     * 解析 timeRange 获取时长（秒）
+     * 支持多种格式，增强容错性
+     * 
+     * 支持格式:
+     * - "0-4s", "2-6s" - 起始 - 结束范围
+     * - "4s", "5.5s" - 纯数字秒数
+     * - "4", "5" - 无单位数字（默认为秒）
+     * - "00:00:04" - HH:MM:SS 格式
+     * - "0:04" - MM:SS 格式
+     * 
      * @param timeRange 时间范围字符串
-     * @return 时长（秒），默认4秒
+     * @return 时长（秒），默认 4 秒
      */
     private int parseTimeRangeDuration(String timeRange) {
         if (timeRange == null || timeRange.isBlank()) {
-            return 4; // 默认4秒
+            return 4; // 默认 4 秒
         }
+
+        String trimmed = timeRange.trim();
+
+        try {
+            // 1. 匹配 "起始 - 结束" 格式，如 "0-4", "0-4s", "2-6s", "2.5-6.5s"
+            Pattern rangePattern = Pattern.compile("(\\d+(?:\\.\\d+)?)[\\s-]+(\\d+(?:\\.\\d+)?)\\s*s?");
+            Matcher rangeMatcher = rangePattern.matcher(trimmed);
+            if (rangeMatcher.find()) {
+                double start = Double.parseDouble(rangeMatcher.group(1));
+                double end = Double.parseDouble(rangeMatcher.group(2));
+                int duration = (int) Math.ceil(end - start);
+                log.debug("解析时间范围：{} -> {}s", timeRange, duration);
+                return duration > 0 ? duration : 4;
+            }
+
+            // 2. 匹配 HH:MM:SS 格式，如 "00:00:04", "01:30:00"
+            Pattern hmsPattern = Pattern.compile("(\\d+):(\\d{2}):(\\d{2})");
+            Matcher hmsMatcher = hmsPattern.matcher(trimmed);
+            if (hmsMatcher.find()) {
+                int hours = Integer.parseInt(hmsMatcher.group(1));
+                int minutes = Integer.parseInt(hmsMatcher.group(2));
+                int seconds = Integer.parseInt(hmsMatcher.group(3));
+                int total = hours * 3600 + minutes * 60 + seconds;
+                log.debug("解析 HMS 时间：{} -> {}s", timeRange, total);
+                return total > 0 ? total : 4;
+            }
+
+            // 3. 匹配 MM:SS 格式，如 "0:04", "1:30"
+            Pattern msPattern = Pattern.compile("(\\d+):(\\d{2})(?!:)");
+            Matcher msMatcher = msPattern.matcher(trimmed);
+            if (msMatcher.find()) {
+                int minutes = Integer.parseInt(msMatcher.group(1));
+                int seconds = Integer.parseInt(msMatcher.group(2));
+                int total = minutes * 60 + seconds;
+                log.debug("解析 MS 时间：{} -> {}s", timeRange, total);
+                return total > 0 ? total : 4;
+            }
+
+            // 4. 匹配纯数字秒数，如 "4s", "4.5s", "4"
+            Pattern simplePattern = Pattern.compile("(\\d+(?:\\.\\d+)?)\\s*s?");
+            Matcher simpleMatcher = simplePattern.matcher(trimmed);
+            if (simpleMatcher.matches()) {
+                int seconds = (int) Math.ceil(Double.parseDouble(simpleMatcher.group(1)));
+                log.debug("解析简单时间：{} -> {}s", timeRange, seconds);
+                return seconds > 0 ? seconds : 4;
+            }
+
+            // 5. 尝试直接解析为数字（无单位）
+            try {
+                int seconds = (int) Math.ceil(Double.parseDouble(trimmed));
+                if (seconds > 0) {
+                    log.debug("解析数字时间：{} -> {}s", timeRange, seconds);
+                    return seconds;
+                }
+            } catch (NumberFormatException e) {
+                // 无法解析，使用默认值
+            }
+
+        } catch (Exception e) {
+            log.warn("时间解析异常，使用默认值：timeRange={}, error={}", timeRange, e.getMessage());
+        }
+
+        log.debug("时间解析失败，使用默认值：timeRange={}", timeRange);
+        return 4; // 默认 4 秒
+    }
 
         // 匹配 "起始-结束s" 格式，如 "0-4s", "2-6s"
         Pattern pattern = Pattern.compile("(\\d+(?:\\.\\d+)?)-(\\d+(?:\\.\\d+)?)s?");

@@ -328,23 +328,28 @@ function getPriorityTagType(priority: string) {
 }
 
 function videoStatusClass(sb: Storyboard) {
+  if (!sb) return ''
   if (sb.generatedVideoUrl) return 'status-done'
   if (sb.status === 'VIDEO_GENERATING') return 'status-generating'
   if (sb.status === 'ERROR') return 'status-error'
   return ''
 }
 
-function videoTagType(status: string) {
+function videoTagType(status: string | undefined) {
+  if (!status) return 'info'
   const map: Record<string, string> = {
     VIDEO_DONE: 'success',
     VIDEO_GENERATING: 'warning',
     IMAGE_DONE: 'info',
+    IMAGE_GENERATING: 'warning',
+    PENDING: 'info',
     ERROR: 'danger',
   }
   return map[status] || 'info'
 }
 
-function videoStatusLabel(status: string) {
+function videoStatusLabel(status: string | undefined) {
+  if (!status) return '未知'
   const map: Record<string, string> = {
     PENDING: '待生成',
     IMAGE_GENERATING: '图片生成中',
@@ -356,7 +361,8 @@ function videoStatusLabel(status: string) {
   return map[status] || status
 }
 
-function getShotSizeLabel(ss: string) {
+function getShotSizeLabel(ss: string | undefined) {
+  if (!ss) return '未知'
   const map: Record<string, string> = {
     EXTREME_CLOSE_UP: '特写', CLOSE_UP: '近景', MEDIUM_CLOSE_UP: '中近景',
     MEDIUM: '中景', MEDIUM_WIDE: '中远景', WIDE: '远景', EXTREME_WIDE: '大远景',
@@ -364,7 +370,8 @@ function getShotSizeLabel(ss: string) {
   return map[ss] || ss
 }
 
-function getCameraAngleLabel(ca: string) {
+function getCameraAngleLabel(ca: string | undefined) {
+  if (!ca) return '未知'
   const map: Record<string, string> = {
     EYE_LEVEL: '平视', HIGH_ANGLE: '俯视', LOW_ANGLE: '仰视',
     BIRD_EYE: '鸟瞰', DUTCH_ANGLE: '倾斜',
@@ -372,13 +379,19 @@ function getCameraAngleLabel(ca: string) {
   return map[ca] || ca
 }
 
-function getCameraMovementLabel(cm: string) {
+function getCameraMovementLabel(cm: string | undefined) {
+  if (!cm) return '未知'
   const map: Record<string, string> = {
     STATIC: '静止', PAN_LEFT: '左摇', PAN_RIGHT: '右摇',
     TILT_UP: '上摇', TILT_DOWN: '下摇', ZOOM_IN: '推近',
     ZOOM_OUT: '拉远', TRACKING: '跟踪', CRANE: '升降', HANDHELD: '手持',
   }
   return map[cm] || cm
+}
+
+function parseCharacterIds(jsonStr: string | undefined): number[] {
+  if (!jsonStr) return []
+  try { return JSON.parse(jsonStr) } catch { return [] }
 }
 </script>
 

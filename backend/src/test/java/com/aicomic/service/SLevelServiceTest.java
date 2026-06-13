@@ -15,6 +15,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -252,5 +253,77 @@ class SLevelServiceTest {
         } finally {
             Files.deleteIfExists(workDir);
         }
+    }
+
+    @Test
+    void testParseTimeRangeDuration_RangeFormat() throws Exception {
+        java.lang.reflect.Method method = SLevelService.class.getDeclaredMethod(
+                "parseTimeRangeDuration", String.class
+        );
+        method.setAccessible(true);
+
+        assertEquals(4, method.invoke(sLevelService, "0-4s"));
+        assertEquals(4, method.invoke(sLevelService, "2-6s"));
+        assertEquals(5, method.invoke(sLevelService, "2.5-7.5s"));
+    }
+
+    @Test
+    void testParseTimeRangeDuration_SimpleSeconds() throws Exception {
+        java.lang.reflect.Method method = SLevelService.class.getDeclaredMethod(
+                "parseTimeRangeDuration", String.class
+        );
+        method.setAccessible(true);
+
+        assertEquals(4, method.invoke(sLevelService, "4s"));
+        assertEquals(5, method.invoke(sLevelService, "4.5s"));
+        assertEquals(10, method.invoke(sLevelService, "10"));
+    }
+
+    @Test
+    void testParseTimeRangeDuration_HMSFormat() throws Exception {
+        java.lang.reflect.Method method = SLevelService.class.getDeclaredMethod(
+                "parseTimeRangeDuration", String.class
+        );
+        method.setAccessible(true);
+
+        assertEquals(4, method.invoke(sLevelService, "00:00:04"));
+        assertEquals(90, method.invoke(sLevelService, "00:01:30"));
+        assertEquals(3661, method.invoke(sLevelService, "01:01:01"));
+    }
+
+    @Test
+    void testParseTimeRangeDuration_MSFormat() throws Exception {
+        java.lang.reflect.Method method = SLevelService.class.getDeclaredMethod(
+                "parseTimeRangeDuration", String.class
+        );
+        method.setAccessible(true);
+
+        assertEquals(4, method.invoke(sLevelService, "0:04"));
+        assertEquals(90, method.invoke(sLevelService, "1:30"));
+        assertEquals(150, method.invoke(sLevelService, "2:30"));
+    }
+
+    @Test
+    void testParseTimeRangeDuration_NullOrBlank() throws Exception {
+        java.lang.reflect.Method method = SLevelService.class.getDeclaredMethod(
+                "parseTimeRangeDuration", String.class
+        );
+        method.setAccessible(true);
+
+        assertEquals(4, method.invoke(sLevelService, null));
+        assertEquals(4, method.invoke(sLevelService, ""));
+        assertEquals(4, method.invoke(sLevelService, "  "));
+    }
+
+    @Test
+    void testParseTimeRangeDuration_InvalidFormat() throws Exception {
+        java.lang.reflect.Method method = SLevelService.class.getDeclaredMethod(
+                "parseTimeRangeDuration", String.class
+        );
+        method.setAccessible(true);
+
+        assertEquals(4, method.invoke(sLevelService, "invalid"));
+        assertEquals(4, method.invoke(sLevelService, "abc-def"));
+        assertEquals(4, method.invoke(sLevelService, "---"));
     }
 }
