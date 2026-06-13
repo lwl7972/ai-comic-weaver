@@ -1,94 +1,118 @@
 package com.aicomic.controller;
 
-import com.aicomic.common.response.ApiResponse;
-import com.aicomic.dto.PromptTemplateRequest;
 import com.aicomic.entity.PromptTemplate;
 import com.aicomic.service.PromptTemplateService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
 
 /**
- * 提示词模板管理 API
+ * 提示词模板控制器
+ * 提供模板 CRUD、渲染、校验等 REST API
  */
 @RestController
 @RequestMapping("/api/v1/prompt-templates")
 @RequiredArgsConstructor
 public class PromptTemplateController {
 
-    private final PromptTemplateService promptTemplateService;
+    private final PromptTemplateService templateService;
 
-    /** GET /api/v1/prompt-templates - 获取所有模板 */
+    /**
+     * 获取所有模板
+     */
     @GetMapping
-    public ApiResponse<List<PromptTemplate>> list() {
-        return ApiResponse.success(promptTemplateService.getAllTemplates());
+    public ResponseEntity<List<PromptTemplate>> getAllTemplates() {
+        return ResponseEntity.ok(templateService.getAllTemplates());
     }
 
-    /** GET /api/v1/prompt-templates?category=SCRIPT - 按分类筛选 */
-    @GetMapping(params = "category")
-    public ApiResponse<List<PromptTemplate>> byCategory(@RequestParam PromptTemplate.TemplateCategory category) {
-        return ApiResponse.success(promptTemplateService.getTemplatesByCategory(category));
+    /**
+     * 按分类获取模板
+     */
+    @GetMapping("/category/{category}")
+    public ResponseEntity<List<PromptTemplate>> getTemplatesByCategory(
+            @PathVariable PromptTemplate.TemplateCategory category
+    ) {
+        return ResponseEntity.ok(templateService.getTemplatesByCategory(category));
     }
 
-    /** GET /api/v1/prompt-templates/defaults - 获取默认模板 */
+    /**
+     * 获取默认模板
+     */
     @GetMapping("/defaults")
-    public ApiResponse<List<PromptTemplate>> defaults() {
-        return ApiResponse.success(promptTemplateService.getDefaultTemplates());
+    public ResponseEntity<List<PromptTemplate>> getDefaultTemplates() {
+        return ResponseEntity.ok(templateService.getDefaultTemplates());
     }
 
-    /** GET /api/v1/prompt-templates/{id} - 获取单个模板 */
+    /**
+     * 获取单个模板
+     */
     @GetMapping("/{id}")
-    public ApiResponse<PromptTemplate> detail(@PathVariable Long id) {
-        return promptTemplateService.getTemplate(id)
-                .map(ApiResponse::success)
-                .orElseGet(() -> ApiResponse.error(ApiResponse.NOT_FOUND, "提示词模板不存在"));
+    public ResponseEntity<PromptTemplate> getTemplate(@PathVariable Long id) {
+        return templateService.getTemplate(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
-    /** POST /api/v1/prompt-templates - 创建模板 */
+    /**
+     * 创建模板
+     */
     @PostMapping
-    public ApiResponse<PromptTemplate> create(@RequestBody PromptTemplateRequest req) {
-        PromptTemplate template = new PromptTemplate();
-        applyRequestToTemplate(template, req);
-        return ApiResponse.success(promptTemplateService.createTemplate(template));
+    public ResponseEntity<PromptTemplate> createTemplate(@RequestBody PromptTemplate template) {
+        return ResponseEntity.ok(templateService.createTemplate(template));
     }
 
-    /** PUT /api/v1/prompt-templates/{id} - 更新模板（版本号自动递增） */
+    /**
+     * 更新模板
+     */
     @PutMapping("/{id}")
-    public ApiResponse<PromptTemplate> update(@PathVariable Long id, @RequestBody PromptTemplateRequest req) {
-        PromptTemplate template = promptTemplateService.getTemplate(id)
-                .orElseGet(PromptTemplate::new);
-        applyRequestToTemplate(template, req);
-        return ApiResponse.success(promptTemplateService.updateTemplate(id, template));
+    public ResponseEntity<PromptTemplate> updateTemplate(
+            @PathVariable Long id,
+            @RequestBody PromptTemplate template
+    ) {
+        try {
+            return ResponseEntity.ok(templateService.updateTemplate(id, template));
+        } catch (Exception e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
-    private void applyRequestToTemplate(PromptTemplate template, PromptTemplateRequest req) {
-        if (req.getName() != null) template.setName(req.getName());
-        if (req.getCategory() != null) template.setCategory(req.getCategory());
-        if (req.getContent() != null) template.setContent(req.getContent());
-        if (req.getVariables() != null) template.setVariables(req.getVariables());
-        if (req.getIsDefault() != null) template.setIsDefault(req.getIsDefault());
-    }
-
-    /** DELETE /api/v1/prompt-templates/{id} - 删除模板 */
+    /**
+     * 删除模板
+     */
     @DeleteMapping("/{id}")
-    public ApiResponse<Void> delete(@PathVariable Long id) {
-        promptTemplateService.deleteTemplate(id);
-        return ApiResponse.success();
+    public ResponseEntity<Void> deleteTemplate(@PathVariable Long id) {
+        templateService.deleteTemplate(id);
+        return ResponseEntity.ok().build();
     }
 
-    /** POST /api/v1/prompt-templates/{id}/render - 渲染提示词 */
+    /**
+     * 渲染模板
+     */
     @PostMapping("/{id}/render")
-    public ApiResponse<String> render(@PathVariable Long id, @RequestBody Map<String, String> variables) {
-        String rendered = promptTemplateService.renderTemplate(id, variables);
-        return ApiResponse.success(rendered);
+    public ResponseEntity<String> renderTemplate(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> variables
+    ) {
+        try {
+            String rendered = templateService.renderTemplate(id, variables);
+            return ResponseEntity.ok(rendered);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
-    /** POST /api/v1/prompt-templates/{id}/validate - 校验模板变量完整性 */
-    @PostMapping("/{id}/validate")
-    public ApiResponse<Map<String, Object>> validate(@PathVariable Long id) {
-        Map<String, Object> result = promptTemplateService.validateTemplate(id);
-        return ApiResponse.success(result);
+    /**
+     * 校验模板变量完整性
+     */
+    @GetMapping("/{id}/validate")
+    public ResponseEntity<Map<String, Object>> validateTemplate(@PathVariable Long id) {
+        Map<String, Object> result = templateService.validateTemplate(id);
+        Boolean isValid = (Boolean) result.get("valid");
+        return isValid ? ResponseEntity.ok(result) : ResponseEntity.badRequest().body(result);
     }
 }

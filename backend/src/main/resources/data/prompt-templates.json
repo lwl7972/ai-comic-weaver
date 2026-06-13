@@ -1,0 +1,82 @@
+[
+  {
+    "name": "小说转大纲",
+    "category": "SCRIPT",
+    "content": "你是一名专业的漫剧剧本编辑。请根据以下小说章节摘要，生成漫剧大纲。\n\n要求：\n1. 提取主要角色和关键情节\n2. 将故事分成 {totalEpisodes} 集\n3. 每集包含：标题、主要冲突、高潮点、悬念结尾\n4. 保持节奏紧凑，适合短视频格式\n\n=== 小说摘要 ===\n{novelSummary}\n\n=== 请输出漫剧大纲（JSON 格式） ===\n```\n{\n  \"title\": \"漫剧标题\",\n  \"episodes\": [\n    {\n      \"episodeNumber\": 1,\n      \"title\": \"第 1 集标题\",\n      \"conflict\": \"主要冲突\",\n      \"climax\": \"高潮点\",\n      \"hook\": \"悬念结尾\"\n    }\n  ]\n}\n```\n",
+    "variables": "[\"totalEpisodes\", \"novelSummary\"]",
+    "isDefault": true,
+    "version": 1
+  },
+  {
+    "name": "大纲生成",
+    "category": "SCRIPT",
+    "content": "你是一名专业的漫剧编剧。请根据以下故事概要，生成完整的漫剧大纲。\n\n要求：\n1. 分析故事主题、类型、目标受众\n2. 设计 {totalEpisodes} 集的完整结构\n3. 每集 800-1200 字，适合 1-2 分钟短视频\n4. 保持节奏紧凑，每集有明确的冲突和悬念\n\n=== 故事概要 ===\n{storySummary}\n\n=== 故事类型 ===\n{genre}\n\n=== 请输出漫剧大纲（JSON 格式） ===\n```\n{\n  \"title\": \"漫剧标题\",\n  \"logline\": \"一句话故事概述\",\n  \"themes\": [\"主题 1\", \"主题 2\"],\n  \"episodes\": [\n    {\n      \"episodeNumber\": 1,\n      \"title\": \"集标题\",\n      \"synopsis\": \"剧情简介 (200 字)\",\n      \"conflict\": \"主要冲突\",\n      \"climax\": \"高潮点\",\n      \"hook\": \"悬念结尾\"\n    }\n  ]\n}\n```\n",
+    "variables": "[\"totalEpisodes\", \"storySummary\", \"genre\"]",
+    "isDefault": true,
+    "version": 1
+  },
+  {
+    "name": "剧本生成",
+    "category": "SCRIPT",
+    "content": "你是一名专业的漫剧剧本作家。请根据大纲生成第 {episodeNumber} 集的完整剧本。\n\n要求：\n1. 格式：场景标题 [地点 - 时间]\n2. 包含：场景描述、角色对话、动作提示、情绪标注\n3. 对话简洁有力，符合角色性格\n4. 适合短视频拍摄，总时长 {duration} 分钟\n\n=== 本集大纲 ===\n{episodeOutline}\n\n=== 前情提要 ===\n{previousEpisode}\n\n=== 角色列表 ===\n{characterList}\n\n=== 请输出完整剧本 ===\n",
+    "variables": "[\"episodeNumber\", \"duration\", \"episodeOutline\", \"previousEpisode\", \"characterList\"]",
+    "isDefault": true,
+    "version": 1
+  },
+  {
+    "name": "角色提取",
+    "category": "CHARACTER",
+    "content": "你是一名专业的角色分析师。请从以下剧本中提取所有角色信息。\n\n要求：\n1. 识别所有有台词的角色\n2. 分析每个角色的：姓名、性别、年龄、身份、性格、外貌特征\n3. 提取角色的经典台词和标志性动作\n4. 输出 JSON 格式，方便导入数据库\n\n=== 剧本内容 ===\n{scriptContent}\n\n=== 请输出角色列表（JSON 格式） ===\n```\n[\n  {\n    \"name\": \"角色名\",\n    \"role\": \"PROTAGONIST/ANTAGONIST/SUPPORTING/EXTRA\",\n    \"gender\": \"MALE/FEMALE/OTHER\",\n    \"ageRange\": \"年龄段\",\n    \"appearance\": \"外貌描述（脸型、眼睛、发型、身材）\",\n    \"personality\": \"性格特征（3-5 个关键词）\",\n    \"occupation\": \"职业/身份\",\n    \"catchphrases\": [\"经典台词 1\", \"经典台词 2\"],\n    \"traits\": [\"特征 1\", \"特征 2\"]\n  }\n]\n```\n",
+    "variables": "[\"scriptContent\"]",
+    "isDefault": true,
+    "version": 1
+  },
+  {
+    "name": "角色定妆图提示词",
+    "category": "CHARACTER",
+    "content": "Create a comic character reference sheet.\n\nCharacter: {name}\nGender: {gender}\nAge: {ageRange}\nAppearance: {appearance}\nPersonality: {personality}\nOccupation: {occupation}\n\nStyle: Modern comic/manga style\nRequirements:\n- Full body shot\n- Neutral expression\n- Clean white background\n- High detail, professional quality\n- Character sheet reference\n\n--ar 3:4\n--niji 6",
+    "variables": "[\"name\", \"gender\", \"ageRange\", \"appearance\", \"personality\", \"occupation\"]",
+    "isDefault": true,
+    "version": 1
+  },
+  {
+    "name": "场景提取",
+    "category": "SCENE",
+    "content": "你是一名专业的场景分析师。请从以下剧本中提取所有场景信息。\n\n要求：\n1. 识别所有独特的场景（地点 + 时间组合）\n2. 提取场景的：名称、描述、时间、天气、风格\n3. 标注场景出现次数和重要程度\n4. 输出 JSON 格式\n\n=== 剧本内容 ===\n{scriptContent}\n\n=== 请输出场景列表（JSON 格式） ===\n```\n[\n  {\n    \"name\": \"场景名（如：咖啡厅 - 室内）\",\n    \"description\": \"详细场景描述（环境、氛围、装饰）\",\n    \"timeOfDay\": \"MORNING/NOON/EVENING/NIGHT\",\n    \"weather\": \"SUNNY/RAINY/CLOUDY\",\n    \"styleHint\": \"风格关键词（如：现代、简约、复古、温馨）\",\n    \"importance\": \"HIGH/MEDIUM/LOW\",\n    \"appearances\": 出现次数\n  }\n]\n```\n",
+    "variables": "[\"scriptContent\"]",
+    "isDefault": true,
+    "version": 1
+  },
+  {
+    "name": "场景四视图提示词",
+    "category": "SCENE",
+    "content": "Create a comic background scene {viewType} view.\n\nScene: {sceneName}\nDescription: {description}\nTime: {timeOfDay}\nWeather: {weather}\nStyle: {styleHint}\n\nView Type: {viewType}\n- Front: straight-on angle\n- Back: from behind\n- Left: left side angle\n- Right: right side angle\n\nRequirements:\n- Detailed environment\n- Atmospheric lighting\n- Comic/manga style background\n- Empty (no characters)\n- Professional game background quality\n\n--ar 16:9\n--niji 6",
+    "variables": "[\"sceneName\", \"description\", \"timeOfDay\", \"weather\", \"styleHint\", \"viewType\"]",
+    "isDefault": true,
+    "version": 1
+  },
+  {
+    "name": "分镜解析",
+    "category": "STORYBOARD",
+    "content": "你是一名专业的分镜师。请将以下剧本场景解析为结构化分镜数据。\n\n要求：\n1. 分析每个镜头的：时间、动作、对话、情绪\n2. 设计景别、机位、运镜\n3. 标注涉及的角色和场景\n4. 输出 JSON 格式，可直接用于生成\n\n=== 剧本场景 ===\n{sceneContent}\n\n=== 角色列表 ===\n{characters}\n\n=== 请输出分镜列表（JSON 格式） ===\n```\n[\n  {\n    \"sequence\": 1,\n    \"timeRange\": \"0-3s\",\n    \"continuity\": \"承接上镜的描述\",\n    \"dialogue\": {\"character\": \"角色名\", \"emotion\": \"情绪\", \"text\": \"台词\"},\n    \"action\": \"动作描述\",\n    \"emotion\": \"整体情绪\",\n    \"shotSize\": \"EXTREME_CLOSE_UP/CLOSE_UP/MEDIUM/WIDE\",\n    \"cameraAngle\": \"EYE_LEVEL/HIGH_ANGLE/LOW_ANGLE\",\n    \"cameraMovement\": \"STATIC/PAN/TILT/ZOOM\",\n    \"characters\": [\"角色名 1\", \"角色名 2\"],\n    \"scene\": \"场景名\"\n  }\n]\n```\n",
+    "variables": "[\"sceneContent\", \"characters\"]",
+    "isDefault": true,
+    "version": 1
+  },
+  {
+    "name": "分镜图生成提示词",
+    "category": "STORYBOARD",
+    "content": "Create a comic storyboard panel.\n\nAction: {action}\nCharacters: {characters}\nScene: {scene}\nEmotion: {emotion}\n\nCamera: {shotSize}, {cameraAngle}, {cameraMovement}\n\nStyle:\n- Comic/manga storyboard\n- Clear composition\n- Dynamic angle\n- Professional quality\n\n--ar 16:9\n--niji 6",
+    "variables": "[\"action\", \"characters\", \"scene\", \"emotion\", \"shotSize\", \"cameraAngle\", \"cameraMovement\"]",
+    "isDefault": true,
+    "version": 1
+  },
+  {
+    "name": "视频生成提示词",
+    "category": "DIRECTOR",
+    "content": "Create a dynamic comic video from this storyboard panel.\n\nAction: {action}\nCharacters: {characters}\nCamera Movement: {cameraMovement}\nEmotion: {emotion}\n\nReference Image: {referenceImageUrl}\n\nRequirements:\n- Smooth animation\n- Comic/manga style\n- Duration: {duration} seconds\n- Add subtle motion to characters\n- Match the storyboard composition\n- Professional quality\n\n--ar 16:9\n--motion 6",
+    "variables": "[\"action\", \"characters\", \"cameraMovement\", \"emotion\", \"referenceImageUrl\", \"duration\"]",
+    "isDefault": true,
+    "version": 1
+  }
+]

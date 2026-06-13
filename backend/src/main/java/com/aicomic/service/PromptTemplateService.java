@@ -245,3 +245,56 @@ public class PromptTemplateService {
         }
     }
 }
+
+    /**
+     * 批量渲染多个模板
+     *
+     * @param templateIds 模板 ID 列表
+     * @param variables   共享的变量键值对
+     * @return Map<模板 ID, 渲染结果>
+     */
+    public Map<Long, String> batchRenderTemplates(List<Long> templateIds, Map<String, String> variables) {
+        return templateIds.stream()
+                .collect(Collectors.toMap(
+                        id -> id,
+                        id -> renderTemplate(id, variables)
+                ));
+    }
+
+    /**
+     * 根据分类和名称获取模板
+     *
+     * @param category 分类
+     * @param name     模板名称
+     * @return 匹配的模板
+     */
+    public Optional<PromptTemplate> getTemplateByName(PromptTemplate.TemplateCategory category, String name) {
+        return getTemplatesByCategory(category).stream()
+                .filter(t -> t.getName().equals(name))
+                .findFirst();
+    }
+
+    /**
+     * 渲染分镜生成提示词（特殊处理：支持多角色、多场景）
+     *
+     * @param templateId      模板 ID
+     * @param basicVars       基础变量
+     * @param characters      角色列表
+     * @param scene           场景描述
+     * @param cameraDirection 镜头指令
+     * @return 渲染后的提示词
+     */
+    public String renderStoryboardPrompt(
+            Long templateId,
+            Map<String, String> basicVars,
+            List<String> characters,
+            String scene,
+            String cameraDirection
+    ) {
+        Map<String, String> enhancedVars = new HashMap<>(basicVars);
+        enhancedVars.put("characters", String.join(", ", characters));
+        enhancedVars.put("scene", scene);
+        enhancedVars.put("cameraDirection", cameraDirection);
+        return renderTemplate(templateId, enhancedVars);
+    }
+}
