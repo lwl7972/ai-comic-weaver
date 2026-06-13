@@ -4,6 +4,37 @@ import http from '@/utils/http'
 import { useNotificationStore } from './notification'
 import type { Storyboard, ShotSize, CameraAngle, CameraMovement, StoryboardStatus } from '@/types'
 
+export const useStoryboardStore = defineStore('storyboard', () => {
+  const storyboards = ref<Storyboard[]>([])
+  const loading = ref(false)
+  const generating = ref(false)
+
+  /**
+   * 解析 JSON 字符串为数字数组（安全处理）
+   * 后端存储的 involvedCharacterIds/involvedSceneIds/referenceImageUrls 为 JSON 字符串
+   */
+  function parseJsonArray(jsonStr: string | undefined | null): number[] {
+    if (!jsonStr) return []
+    try {
+      const parsed = JSON.parse(jsonStr)
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return []
+    }
+  }
+
+  /**
+   * 安全解析后端返回的 JSON 字符串字段
+   * 自动处理类型转换，避免前端类型不匹配问题
+   */
+  function parseStoryboardReferences(sb: Storyboard) {
+    return {
+      ...sb,
+      _characterIds: parseJsonArray(sb.involvedCharacterIds),
+      _sceneIds: parseJsonArray(sb.referenceImageUrls),
+    }
+  }
+
 /**
  * Storyboard module Store
  */
@@ -128,6 +159,6 @@ export const useStoryboardStore = defineStore('storyboard', () => {
     storyboards, loading, generating,
     fetchStoryboards, createStoryboard, updateStoryboard, deleteStoryboard,
     parseScript, batchUpdateStoryboards, generateImages, regenerateImage,
-    resolveReferences,
+    resolveReferences, parseStoryboardReferences, parseJsonArray,
   }
 })

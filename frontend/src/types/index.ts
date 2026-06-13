@@ -219,20 +219,20 @@ export interface Storyboard {
   sequence: number
   timeRange: string          // "0-4s"
   continuity: string         // 承接上镜描述
-  dialogue?: string          // [角色名, 情绪]:"台词"
+  dialogue?: string          // [角色名，情绪]:"台词"
   action?: string            // 动作描述
   emotion?: string           // 情绪标签
   shotSize: ShotSize         // 特写/中景/远景 etc.
   cameraAngle: CameraAngle   // 机位角度
   cameraMovement: CameraMovement // 运镜方式
-  involvedCharacters: string // JSON array of character names
-  involvedCharacterIds?: string // JSON array of character IDs (角色定妆图引用)
+  involvedCharacters: string // JSON array of character names (后端返回 JSON 字符串)
+  involvedCharacterIds?: string // JSON array of character IDs (后端返回 JSON 字符串，前端需解析)
   involvedSceneName: string
-  involvedSceneId?: number   // 场景ID (场景图引用)
-  referenceImageUrls?: string // JSON array of collected reference image URLs
+  involvedSceneId?: number   // 场景 ID (场景图引用)
+  referenceImageUrls?: string // JSON array of collected reference image URLs (后端返回 JSON 字符串)
   bgSound?: string
-  generatedImageUrl?: string // 生成的分镜图URL
-  generatedVideoUrl?: string // 生成的视频URL
+  generatedImageUrl?: string // 生成的分镜图 URL
+  generatedVideoUrl?: string // 生成的视频 URL
   generationPurpose: GenerationPurpose
   status: StoryboardStatus
   createdAt: string

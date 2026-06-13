@@ -1,25 +1,20 @@
 package com.aicomic.service;
 
 import com.aicomic.common.exception.ResourceNotFoundException;
-import com.aicomic.common.event.AssetExtractedEvent;
+import com.aicomic.dto.CharacterCreateRequest;
+import com.aicomic.dto.CharacterUpdateRequest;
 import com.aicomic.entity.Character;
 import com.aicomic.entity.ExtractedAsset;
 import com.aicomic.entity.Project;
-import com.aicomic.entity.Script;
-import com.aicomic.entity.Episode;
-import com.aicomic.entity.ModelConfig;
 import com.aicomic.repository.CharacterRepository;
 import com.aicomic.repository.ExtractedAssetRepository;
-import com.aicomic.repository.ScriptRepository;
-import com.aicomic.repository.EpisodeRepository;
-import com.aicomic.service.model.ModelCallException;
-import com.aicomic.service.model.ModelCallService;
+import com.aicomic.repository.ProjectRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.event.EventListener;
-import org.springframework.scheduling.annotation.Async;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -295,17 +290,12 @@ public class CharacterService {
     }
 
     /**
-     * 从 LLM 返回结果中提取 JSON 字符串
+     * 查询项目下所有角色（带缓存）
      */
-    private String extractJsonFromResult(String result) {
-        String jsonStr = result;
-        int startIdx = result.indexOf("```json");
-        if (startIdx >= 0) {
-            startIdx += 7;
-            int endIdx = result.indexOf("```", startIdx);
-            if (endIdx > startIdx) {
-                jsonStr = result.substring(startIdx, endIdx).trim();
-            }
+    @Cacheable(value = "characters", key = "'project:' + #projectId", unless = "#result.isEmpty()")
+    public List<Character> findByProjectId(Long projectId) {
+        return characterRepository.findByProjectIdOrderByNameAsc(projectId);
+    }
         } else if (result.contains("[")) {
             startIdx = result.indexOf("[");
             int endIdx = result.lastIndexOf("]") + 1;

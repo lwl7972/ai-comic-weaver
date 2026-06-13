@@ -4,7 +4,9 @@ import com.aicomic.common.util.FFmpegUtils;
 import com.aicomic.dto.CompositeRequest;
 import com.aicomic.dto.ExportConfig;
 import com.aicomic.dto.WatermarkConfig;
+import com.aicomic.entity.AudioTrack;
 import com.aicomic.entity.Storyboard;
+import com.aicomic.repository.AudioTrackRepository;
 import com.aicomic.repository.StoryboardRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +34,7 @@ import java.util.regex.Pattern;
 public class SLevelService {
 
     private final StoryboardRepository storyboardRepository;
+    private final AudioTrackRepository audioTrackRepository;
     private final FFmpegUtils ffmpegUtils;
     private final SseService sseService;
 
@@ -101,25 +104,51 @@ public class SLevelService {
                 log.info("字幕烧录完成: {}", subtitleOutput);
             }
 
-            // 5. 音频混合（暂跳过，后续音频库任务启用）
+            // 4. 音频混合
             if (request.isMixAudio()) {
-                sseService.pushNotification("slevel-progress", "音频混合暂未启用，跳过...");
-                log.info("音频混合暂未启用，跳过");
+                sseService.pushNotification("slevel-progress", "正在混合音频轨道...");
+
+                try {
+                    List<FFmpegUtils.AudioInput> audioInputs = buildAudioInputs(
+                            request.getEpisodeId(),
+                            request.getAudioTrackIds(),
+                            workDir
+                    );
+
+                    if (!audioInputs.isEmpty()) {
+                        Path audioOutput = workDir.resolve("audio_mixed.mp4");
+                        FFmpegUtils.FFmpegResult audioResult = ffmpegUtils.mixAudio(
+                                currentVideo,
+                                audioInputs,
+                                audioOutput.toString()
+                        );
+                        currentVideo = audioOutput.toString();
+                        log.info("音频混合完成：{}", audioOutput);
+                        sseService.pushNotification("slevel-progress", "音频混合完成");
+                    } else {
+                        log.info("未找到音频轨道，跳过音频混合");
+                        sseService.pushNotification("slevel-progress", "未找到音频轨道，跳过音频混合");
+                    }
+                } catch (Exception e) {
+                    log.error("音频混合失败：{}", e.getMessage(), e);
+                    sseService.pushNotification("slevel-error", "音频混合失败：" + e.getMessage());
+                    throw e;
+                }
             }
 
-            // 6. 转场特效
+            // 5. 转场特效
             if (request.getTransitionType() != null && !request.getTransitionType().isBlank()) {
                 sseService.pushNotification("slevel-progress",
-                        "正在添加转场特效(" + request.getTransitionType() + ")...");
+                        "正在添加转场特效 (" + request.getTransitionType() + ")...");
 
                 Path transitionOutput = workDir.resolve("transition.mp4");
                 ffmpegUtils.addTransition(currentVideo, request.getTransitionType(),
                         request.getTransitionDuration(), transitionOutput.toString());
                 currentVideo = transitionOutput.toString();
-                log.info("转场特效添加完成: {}", transitionOutput);
+                log.info("转场特效添加完成：{}", transitionOutput);
             }
 
-            // 7. 复制最终文件
+            // 6. 复制最终文件
             sseService.pushNotification("slevel-progress", "正在生成最终成片...");
 
             String finalFileName = "episode-" + request.getEpisodeId() + "-final.mp4";
@@ -218,11 +247,55 @@ public class SLevelService {
     // ==================== 辅助方法 ====================
 
     /**
-     * 从分镜对话生成SRT字幕文件
+     * 构建音频输入列表
      *
-     * @param storyboards 分镜列表（按sequence排序）
+     * @param episodeId      剧集 ID
+     * @param audioTrackIds  指定的音频轨道 ID 列表（为空时使用默认配置）
+     * @param workDir        工作目录
+     * @return FFmpeg 音频输入列表
+     */
+    private List<FFmpegUtils.AudioInput> buildAudioInputs(
+            Long episodeId,
+            List<Long> audioTrackIds,
+            Path workDir
+    ) throws IOException {
+        List<AudioTrack> audioTracks;
+
+        if (audioTrackIds != null && !audioTrackIds.isEmpty()) {
+            audioTracks = audioTrackIds.stream()
+                    .map(id -> audioTrackRepository.findById(id).orElse(null))
+                    .filter(track -> track != null)
+                    .toList();
+        } else {
+            audioTracks = audioTrackRepository.findByEpisodeIdOrderByCreatedAtAsc(episodeId);
+        }
+
+        List<FFmpegUtils.AudioInput> audioInputs = new ArrayList<>();
+        for (AudioTrack track : audioTracks) {
+            if (track.getFilePath() == null || track.getFilePath().isBlank()) {
+                log.warn("音频轨道文件路径为空：trackId={}", track.getId());
+                continue;
+            }
+
+            String localPath = downloadToTemp(track.getFilePath(), workDir.toString());
+            FFmpegUtils.AudioInput input = new FFmpegUtils.AudioInput();
+            input.setFilePath(localPath);
+            input.setVolume(track.getVolume() != null ? track.getVolume() : 1.0);
+            audioInputs.add(input);
+
+            log.info("添加音频轨道：type={}, name={}, volume={}",
+                    track.getType(), track.getName(), input.getVolume());
+        }
+
+        return audioInputs;
+    }
+
+    /**
+     * 从分镜对话生成 SRT 字幕文件
+     *
+     * @param storyboards 分镜列表（按 sequence 排序）
      * @param workDir     工作目录
-     * @return SRT文件路径
+     * @return SRT 文件路径
      */
     private String generateSrtFile(List<Storyboard> storyboards, String workDir) throws IOException {
         Path srtPath = Paths.get(workDir, "subtitles.srt");

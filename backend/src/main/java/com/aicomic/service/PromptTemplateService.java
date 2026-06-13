@@ -7,6 +7,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,44 +33,50 @@ public class PromptTemplateService {
     private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\{(\\w+)}");
 
     /**
-     * 获取所有模板
+     * 获取所有模板（带缓存）
      */
+    @Cacheable(value = "templates", key = "'all'", unless = "#result.isEmpty()")
     public List<PromptTemplate> getAllTemplates() {
         return promptTemplateRepository.findAll();
     }
 
     /**
-     * 按分类获取模板
+     * 按分类获取模板（带缓存）
      */
+    @Cacheable(value = "templates", key = "'category:' + #category", unless = "#result.isEmpty()")
     public List<PromptTemplate> getTemplatesByCategory(PromptTemplate.TemplateCategory category) {
         return promptTemplateRepository.findByCategory(category);
     }
 
     /**
-     * 获取默认模板
+     * 获取默认模板（带缓存）
      */
+    @Cacheable(value = "templates", key = "'default'", unless = "#result.isEmpty()")
     public List<PromptTemplate> getDefaultTemplates() {
         return promptTemplateRepository.findByIsDefaultTrue();
     }
 
     /**
-     * 获取单个模板
+     * 获取单个模板（带缓存）
      */
+    @Cacheable(value = "templates", key = "#id", unless = "#result.empty")
     public Optional<PromptTemplate> getTemplate(Long id) {
         return promptTemplateRepository.findById(id);
     }
 
     /**
-     * 创建模板
+     * 创建模板时清除缓存
      */
+    @CacheEvict(value = "templates", allEntries = true)
     @Transactional
     public PromptTemplate createTemplate(PromptTemplate template) {
         return promptTemplateRepository.save(template);
     }
 
     /**
-     * 更新模板
+     * 更新模板时清除缓存
      */
+    @CacheEvict(value = "templates", allEntries = true)
     @Transactional
     public PromptTemplate updateTemplate(Long id, PromptTemplate updated) {
         return promptTemplateRepository.findById(id).map(template -> {

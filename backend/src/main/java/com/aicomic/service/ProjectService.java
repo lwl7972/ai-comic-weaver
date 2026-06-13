@@ -6,6 +6,8 @@ import com.aicomic.entity.Project;
 import com.aicomic.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,9 +33,26 @@ public class ProjectService {
     private final GenerationTaskRepository generationTaskRepository;
 
     /**
-     * 删除项目及其所有关联数据（级联删除）
-     * 按依赖顺序删除：分镜 → 剧集 → 生成任务 → 角色/场景/小说/剧本 → 流水线 → 项目
+     * 根据 ID 查询项目（带缓存）
      */
+    @Cacheable(value = "projects", key = "#projectId", unless = "#result == null")
+    public Project findById(Long projectId) {
+        return projectRepository.findById(projectId)
+                .orElseThrow(() -> new ResourceNotFoundException("项目", projectId));
+    }
+
+    /**
+     * 查询所有项目（带缓存）
+     */
+    @Cacheable(value = "projects", key = "'all'")
+    public List<Project> findAll() {
+        return projectRepository.findAllByOrderByCreatedAtDesc();
+    }
+
+    /**
+     * 删除项目时清除缓存
+     */
+    @CacheEvict(value = "projects", allEntries = true)
     @Transactional
     public void deleteProject(Long projectId) {
         if (!projectRepository.existsById(projectId)) {

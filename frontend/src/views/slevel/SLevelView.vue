@@ -89,6 +89,42 @@
       </div>
     </el-card>
 
+    <!-- Video Player Card -->
+    <el-card class="operation-card">
+      <template #header>
+        <span>成片预览</span>
+      </template>
+      <div class="op-body">
+        <div v-if="finalVideoUrl" class="video-container">
+          <video
+            ref="videoPlayer"
+            :src="finalVideoUrl"
+            controls
+            preload="metadata"
+            class="video-player"
+          >
+            您的浏览器不支持视频播放
+          </video>
+        </div>
+        <el-empty v-else description="暂无可播放的视频，请先生成成片" />
+        <div class="video-actions">
+          <el-button
+            type="primary"
+            :disabled="!finalVideoUrl"
+            @click="downloadVideo"
+          >
+            <el-icon><Download /></el-icon> 下载视频
+          </el-button>
+          <el-button
+            :disabled="!finalVideoUrl"
+            @click="reloadVideo"
+          >
+            刷新视频
+          </el-button>
+        </div>
+      </div>
+    </el-card>
+
     <!-- Export Card -->
     <el-card class="operation-card">
       <template #header>
@@ -264,6 +300,9 @@ const exportEpisodeId = ref<number | undefined>(undefined)
 // 集数选择 - 水印
 const watermarkEpisodeId = ref<number | undefined>(undefined)
 
+const videoPlayer = ref<HTMLVideoElement | null>(null)
+const finalVideoUrl = ref<string>('')
+
 // {{ t('sLevel.composite') }}参数
 const composeForm = ref({
   addSubtitles: true,
@@ -321,6 +360,28 @@ async function handleAddWatermark() {
   if (!projectId.value || !watermarkEpisodeId.value) return
   await slevelStore.addWatermark(projectId.value, watermarkEpisodeId.value, watermarkForm.value)
 }
+
+function downloadVideo() {
+  if (!finalVideoUrl.value) return
+  const link = document.createElement('a')
+  link.href = finalVideoUrl.value
+  link.download = `episode-${exportEpisodeId.value}-final.mp4`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+}
+
+function reloadVideo() {
+  if (videoPlayer.value) {
+    videoPlayer.value.load()
+  }
+}
+
+watch(() => slevelStore.composeStep, (step) => {
+  if (step === 5) {
+    finalVideoUrl.value = `/api/v1/episodes/${selectedEpisodeId.value}/output/episode-${selectedEpisodeId.value}-final.mp4`
+  }
+})
 </script>
 
 <style scoped>
@@ -354,5 +415,23 @@ async function handleAddWatermark() {
 .op-action {
   text-align: center;
   margin-top: 16px;
+}
+.video-container {
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+}
+.video-player {
+  width: 100%;
+  height: auto;
+  border-radius: 4px;
+  background: #000;
+}
+.video-actions {
+  text-align: center;
+  margin-top: 16px;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
 }
 </style>
