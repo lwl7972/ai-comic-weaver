@@ -8,19 +8,38 @@
       <div class="header-right">
         <el-button
           type="primary"
-        :loading="directorStore.generating"
-        :disabled="directorStore.storyboards.length === 0"
-        @click="handleGenerateFullVideo"
+          :loading="directorStore.generating"
+          :disabled="directorStore.storyboards.length === 0"
+          @click="handleGenerateFullVideo"
         >
           <el-icon><VideoCamera /></el-icon> {{ t('director.generateFullVideo') }}
         </el-button>
         <el-button
-        :loading="directorStore.generating"
-        :disabled="directorStore.storyboards.length === 0"
-        @click="handleConcatVideos"
+          :loading="directorStore.generating"
+          :disabled="directorStore.storyboards.length === 0"
+          @click="handleConcatVideos"
         >
           <el-icon><Connection /></el-icon> FFmpeg 拼接
         </el-button>
+        <el-dropdown :disabled="!directorStore.queueStats" trigger="click">
+          <el-button :disabled="!directorStore.queueStats">
+            队列管理<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+          </el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item @click="handlePauseQueue" :disabled="directorStore.queueStats?.paused">
+                <el-icon><VideoPause /></el-icon> 暂停队列
+              </el-dropdown-item>
+              <el-dropdown-item @click="handleResumeQueue" :disabled="!directorStore.queueStats?.paused">
+                <el-icon><VideoPlay /></el-icon> 恢复队列
+              </el-dropdown-item>
+              <el-divider style="margin: 4px 0" />
+              <el-dropdown-item @click="handleViewQueueStats">
+                <el-icon><DataAnalysis /></el-icon> 查看统计
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
       </div>
     </div>
 
@@ -116,7 +135,80 @@
             生成视频
           </el-button>
         </div>
-      </el-card>
+    </el-card>
+
+    <!-- Queue Stats Card -->
+    <el-card v-if="directorStore.queueStats" class="queue-stats-card">
+      <template #header>
+        <div class="card-header">
+          <span>队列状态</span>
+          <el-tag :type="directorStore.queueStats.paused ? 'warning' : 'success'">
+            {{ directorStore.queueStats.paused ? '已暂停' : '运行中' }}
+          </el-tag>
+        </div>
+      </template>
+      <div class="queue-stats">
+        <el-space :size="16">
+          <el-statistic title="等待中" :value="directorStore.queueStats.pendingCount" />
+          <el-statistic title="执行中" :value="directorStore.queueStats.runningCount" />
+          <el-statistic title="已完成" :value="directorStore.queueStats.completedCount" />
+          <el-statistic title="失败" :value="directorStore.queueStats.failedCount" />
+          <el-statistic title="已取消" :value="directorStore.queueStats.cancelledCount" />
+          <el-divider direction="vertical" />
+          <el-statistic title="总任务" :value="directorStore.queueStats.totalCount" />
+          <el-statistic title="最大并发" :value="directorStore.queueStats.maxConcurrent" />
+        </el-space>
+      </div>
+    </el-card>
+
+    <!-- Task List Card -->
+    <el-card v-if="directorStore.tasks.length > 0" class="task-list-card">
+      <template #header>
+        <span>任务列表</span>
+      </template>
+      <el-table :data="directorStore.tasks" stripe style="width: 100%">
+        <el-table-column prop="taskId" label="Task ID" width="200" />
+        <el-table-column prop="taskType" label="类型" width="120">
+          <template #default="{ row }">
+            <el-tag :type="row.taskType === 'FULL_EPISODE' ? 'primary' : 'success'">
+              {{ row.taskType === 'FULL_EPISODE' ? '整集生成' : '单镜头' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="status" label="状态" width="100">
+          <template #default="{ row }">
+            <el-tag :type="getStatusTagType(row.status)">
+              {{ getStatusLabel(row.status) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="priority" label="优先级" width="80">
+          <template #default="{ row }">
+            <el-tag :type="getPriorityTagType(row.priority)" size="small">
+              {{ row.priority }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="progress" label="进度">
+          <template #default="{ row }">
+            <el-progress :percentage="row.progress" :status="row.status === 'SUCCESS' ? 'success' : undefined" />
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="150">
+          <template #default="{ row }">
+            <el-button
+              v-if="row.status === 'PENDING' || row.status === 'RUNNING'"
+              size="small"
+              type="danger"
+              @click="handleCancelTask(row.taskId)"
+            >
+              取消
+            </el-button>
+            <el-button v-else size="small" disabled>已完成</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
     </div>
   </div>
 </template>
@@ -126,7 +218,7 @@ import { useI18n } from 'vue-i18n'
 const { t } = useI18n()
 import { onMounted, computed, onUnmounted } from 'vue'
 import {
-  VideoCamera, Connection, Loading, Picture, VideoPlay,
+  VideoCamera, Connection, Loading, Picture, VideoPlay, ArrowDown, VideoPause, DataAnalysis,
 } from '@element-plus/icons-vue'
 import { useProjectStore } from '@/stores/project'
 import { useDirectorStore } from '@/stores/director'
@@ -182,6 +274,57 @@ async function handleGenerateShotVideo(storyboardId: number) {
 
 async function handleConcatVideos() {
   await directorStore.concatVideos(episodeId.value)
+}
+
+async function handlePauseQueue() {
+  await directorStore.pauseQueue()
+}
+
+async function handleResumeQueue() {
+  await directorStore.resumeQueue()
+}
+
+async function handleCancelTask(taskId: string) {
+  if (confirm('确定要取消此任务吗？')) {
+    await directorStore.cancelTask(taskId)
+  }
+}
+
+async function handleViewQueueStats() {
+  await directorStore.fetchQueueStats()
+  await directorStore.fetchTasks()
+  useNotificationStore().info('队列统计已刷新')
+}
+
+function getStatusTagType(status: string) {
+  const map: Record<string, string> = {
+    PENDING: 'info',
+    RUNNING: 'warning',
+    SUCCESS: 'success',
+    FAILED: 'danger',
+    CANCELLED: 'info',
+  }
+  return map[status] || 'info'
+}
+
+function getStatusLabel(status: string) {
+  const map: Record<string, string> = {
+    PENDING: '等待中',
+    RUNNING: '执行中',
+    SUCCESS: '完成',
+    FAILED: '失败',
+    CANCELLED: '已取消',
+  }
+  return map[status] || status
+}
+
+function getPriorityTagType(priority: string) {
+  const map: Record<string, string> = {
+    HIGH: 'danger',
+    MEDIUM: 'warning',
+    LOW: 'info',
+  }
+  return map[priority] || 'info'
 }
 
 function videoStatusClass(sb: Storyboard) {
@@ -278,6 +421,22 @@ function getCameraMovementLabel(cm: string) {
   margin-left: auto;
   font-size: 13px;
   color: #909399;
+}
+.queue-stats-card {
+  margin-bottom: 16px;
+}
+.queue-stats-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.queue-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.task-list-card {
+  margin-bottom: 16px;
 }
 .shot-list {
   display: grid;
