@@ -98,7 +98,7 @@ public class CharacterService {
 
             sseService.pushNotification("character-progress", "Extracting characters with AI...");
 
-            String prompt = buildCharacterExtractionPrompt(scriptContent);
+            String prompt = buildCharacterExtractionPromptWithTemplate(scriptContent);
             String result = modelCallService.callText(ModelConfig.ModelType.TEXT, prompt);
 
             List<ExtractedAsset> assets = parseExtractedCharacters(result, projectId);
@@ -130,7 +130,7 @@ public class CharacterService {
             sseService.pushNotification("character-progress",
                     String.format("Generating makeup image for '%s'...", character.getName()));
 
-            String makeupPrompt = buildMakeupPrompt(character);
+            String makeupPrompt = buildMakeupPromptWithTemplate(character);
             String imageUrl = modelCallService.callImage(makeupPrompt, null);
 
             character.setAnchorPrompt(makeupPrompt);
@@ -345,4 +345,52 @@ public class CharacterService {
         sb.append("high quality, fine details, comic style");
         return sb.toString();
     }
+
+    // ==================== Template-based Prompt Generation ====================
+
+    /**
+     * 构建角色提取提示词（使用模板）
+     */
+    private String buildCharacterExtractionPromptWithTemplate(String scriptContent) {
+        try {
+            var templateOpt = promptTemplateService.getTemplateByName(
+                PromptTemplate.TemplateCategory.CHARACTER, "角色提取");
+            if (templateOpt.isPresent()) {
+                var template = templateOpt.get();
+                java.util.Map<String, String> variables = new java.util.HashMap<>();
+                variables.put("scriptContent", scriptContent.length() > 30000 ? 
+                    scriptContent.substring(0, 30000) + "
+...(content truncated)" : scriptContent);
+                return promptTemplateService.renderTemplate(template.getId(), variables);
+            }
+        } catch (Exception e) {
+            log.warn("模板渲染失败，使用硬编码提示词：{}", e.getMessage());
+        }
+        return buildCharacterExtractionPromptWithTemplate(scriptContent);
+    }
+
+    /**
+     * 构建角色定妆图提示词（使用模板）
+     */
+    private String buildMakeupPromptWithTemplate(Character character) {
+        try {
+            var templateOpt = promptTemplateService.getTemplateByName(
+                PromptTemplate.TemplateCategory.CHARACTER, "角色定妆图提示词");
+            if (templateOpt.isPresent()) {
+                var template = templateOpt.get();
+                java.util.Map<String, String> variables = new java.util.HashMap<>();
+                variables.put("name", character.getName());
+                variables.put("gender", character.getGender() == Character.Gender.MALE ? "male" : "female");
+                variables.put("ageRange", character.getAgeRange());
+                variables.put("appearance", character.getAppearance());
+                variables.put("personality", character.getPersonality());
+                variables.put("occupation", character.getOccupation());
+                return promptTemplateService.renderTemplate(template.getId(), variables);
+            }
+        } catch (Exception e) {
+            log.warn("模板渲染失败，使用硬编码提示词：{}", e.getMessage());
+        }
+        return buildMakeupPromptWithTemplate(character);
+    }
+
 }
