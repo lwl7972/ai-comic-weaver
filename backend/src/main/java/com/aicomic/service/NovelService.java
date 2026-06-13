@@ -194,7 +194,7 @@ public class NovelService {
 
             // 2. Generate outline (A.5) — 使用公共工具类
             sseService.pushNotification("novel-progress", "Generating script outline...");
-            String outlinePrompt = ScriptPromptHelper.buildOutlinePrompt(allSummaries, novel.getTitle());
+            String outlinePrompt = buildOutlinePromptWithTemplate(allSummaries, novel.getTitle());
             String outlineText = modelCallService.callText(ModelConfig.ModelType.TEXT, outlinePrompt);
 
             // 3. Create Script
@@ -232,7 +232,7 @@ public class NovelService {
                 sseService.pushNotification("novel-progress",
                         String.format("Generating episode %d script (%d/%d)...", i + 1, i + 1, episodes.size()));
 
-                String episodePrompt = ScriptPromptHelper.buildEpisodeScriptPromptFromSummary(
+                String episodePrompt = buildEpisodeScriptPromptWithTemplate(
                         allSummaries, episodeOutline, i + 1);
                 String scriptContent = modelCallService.callText(ModelConfig.ModelType.TEXT, episodePrompt);
 
@@ -314,4 +314,50 @@ public class NovelService {
                 + "=== Novel Chapter Content ===\n" + chapterContent + "\n\n"
                 + "=== Please output structured summary ===";
     }
+
+    // ==================== Template-based Prompt Generation ====================
+
+    /**
+     * 构建大纲生成提示词（使用模板）优先使用模板系统，回退到硬编码 helper
+     */
+    private String buildOutlinePromptWithTemplate(String summaryText, String title) {
+        try {
+            var templateOpt = promptTemplateService.getTemplateByName(
+                PromptTemplate.TemplateCategory.SCRIPT, "小说转大纲");
+            if (templateOpt.isPresent()) {
+                var template = templateOpt.get();
+                java.util.Map<String, String> variables = new java.util.HashMap<>();
+                variables.put("totalEpisodes", "8");
+                variables.put("novelSummary", summaryText);
+                return promptTemplateService.renderTemplate(template.getId(), variables);
+            }
+        } catch (Exception e) {
+            log.warn("模板渲染失败，使用硬编码提示词：{}", e.getMessage());
+        }
+        return ScriptPromptHelper.buildOutlinePrompt(summaryText, title);
+    }
+
+    /**
+     * 构建剧本生成提示词（使用模板）优先使用模板系统，回退到硬编码 helper
+     */
+    private String buildEpisodeScriptPromptWithTemplate(String allSummaries, String episodeOutline, int episodeNum) {
+        try {
+            var templateOpt = promptTemplateService.getTemplateByName(
+                PromptTemplate.TemplateCategory.SCRIPT, "剧本生成");
+            if (templateOpt.isPresent()) {
+                var template = templateOpt.get();
+                java.util.Map<String, String> variables = new java.util.HashMap<>();
+                variables.put("episodeNumber", String.valueOf(episodeNum));
+                variables.put("duration", "3");
+                variables.put("episodeOutline", episodeOutline);
+                variables.put("previousEpisode", "无");
+                variables.put("characterList", "暂无角色信息");
+                return promptTemplateService.renderTemplate(template.getId(), variables);
+            }
+        } catch (Exception e) {
+            log.warn("模板渲染失败，使用硬编码提示词：{}", e.getMessage());
+        }
+        return buildEpisodeScriptPromptWithTemplate(allSummaries, episodeOutline, episodeNum);
+    }
+
 }
