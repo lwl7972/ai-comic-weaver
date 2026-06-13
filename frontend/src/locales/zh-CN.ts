@@ -177,6 +177,7 @@ export default {
   },
   config: {
     title: '⚙️ 配置中心',
+    description: '模型配置、提示词模板管理、应用全局设置',
     modelConfig: '模型配置',
     promptTemplate: '提示词模板',
     appConfig: '应用配置',

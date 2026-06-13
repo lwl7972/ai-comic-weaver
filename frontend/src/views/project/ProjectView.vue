@@ -1,16 +1,16 @@
 <template>
   <div class="view-container">
-    <h2>项目管理</h2>
-    <p class="description">创建和管理您的漫剧项目。每个项目包含完整的六大模块数据。</p>
+    <h2>{{ t('project.title') }}</h2>
+    <p class="description">{{ t('project.description') }}</p>
 
     <div class="toolbar">
       <el-button type="primary" @click="showCreateDialog = true">
         <el-icon><Plus /></el-icon>
-        新建项目
+        {{ t('project.createProject') }}
       </el-button>
       <el-button @click="openTemplateDialog">
         <el-icon><DocumentCopy /></el-icon>
-        从模板创建
+        {{ t('project.createFromTemplate') }}
       </el-button>
     </div>
 
@@ -35,7 +35,7 @@
     </el-table>
 
     <!-- Create Project Dialog -->
-    <el-dialog v-model="showCreateDialog" title="新建项目" width="480px">
+    <el-dialog v-model="showCreateDialog" title="{{ t('project.createProject') }}" width="480px">
       <el-form :model="createForm" label-width="80px">
         <el-form-item label="项目名称">
           <el-input v-model="createForm.name" placeholder="请输入项目名称" />
@@ -58,7 +58,7 @@
     </el-dialog>
 
     <!-- Create From Template Dialog -->
-    <el-dialog v-model="showTemplateDialog" title="从模板创建项目" width="720px" top="5vh">
+    <el-dialog v-model="showTemplateDialog" title="{{ t('project.createFromTemplate') }}项目" width="720px" top="5vh">
       <!-- Step 1: Select Template -->
       <div v-if="templateStep === 1">
         <div v-if="templateStore.loading" style="text-align: center; padding: 40px 0;">
@@ -126,6 +126,7 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Plus, DocumentCopy, Loading } from '@element-plus/icons-vue'
@@ -256,7 +257,7 @@ async function handleCreateFromTemplate() {
       templateProjectForm.value.name,
       templateProjectForm.value.description,
     )
-    notification.success('从模板创建项目成功')
+    notification.success('{{ t('project.createFromTemplate') }}项目成功')
     showTemplateDialog.value = false
     await projectStore.fetchProjects()
     projects.value = projectStore.projectList as unknown as ProjectItem[]

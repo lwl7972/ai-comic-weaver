@@ -2,12 +2,12 @@
   <div class="character-view">
     <div class="view-header">
       <div class="header-left">
-        <h2>🎭 角色模块</h2>
+        <h2>{{ t('character.title') }}</h2>
         <p class="description">AI资产提取、6层身份锚点、定妆图管理与角色圣经</p>
       </div>
       <div class="header-right">
         <el-button type="primary" @click="showCreateDialog = true">
-          <el-icon><Plus /></el-icon> 新建角色
+          <el-icon><Plus /></el-icon> {{ t('character.createCharacter') }}
         </el-button>
         <el-button
           :loading="charStore.generating"
@@ -21,7 +21,7 @@
     <!-- Pending Confirmation Assets -->
     <el-card v-if="charStore.extractedAssets.length > 0" class="pending-card">
       <template #header>
-        <span>待确认角色 ({{ charStore.extractedAssets.length }})</span>
+        <span>{{ t('character.extractedTip') }} ({{ charStore.extractedAssets.length }})</span>
       </template>
       <div class="pending-list">
         <div v-for="asset in charStore.extractedAssets" :key="asset.id" class="pending-item">
@@ -30,7 +30,7 @@
             <span class="pending-desc">{{ asset.description }}</span>
           </div>
           <div class="pending-actions">
-            <el-button type="primary" size="small" @click="handleConfirmAsset(asset.id!)">确认入库</el-button>
+            <el-button type="primary" size="small" @click="handleConfirmAsset(asset.id!)">{{ t('character.confirm') }}</el-button>
           </div>
         </div>
       </div>
@@ -125,6 +125,7 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { ref, onMounted, computed } from 'vue'
 import { Plus, Loading, User } from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus'

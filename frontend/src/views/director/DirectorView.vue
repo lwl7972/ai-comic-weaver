@@ -2,7 +2,7 @@
   <div class="director-view">
     <div class="view-header">
       <div class="header-left">
-        <h2>🎥 导演模块</h2>
+        <h2>{{ t('director.title') }}</h2>
         <p class="description">整集视频生成调度、单镜头回退方案、FFmpeg拼接合成</p>
       </div>
       <div class="header-right">
@@ -12,7 +12,7 @@
         :disabled="directorStore.storyboards.length === 0"
         @click="handleGenerateFullVideo"
         >
-          <el-icon><VideoCamera /></el-icon> 生成整集视频
+          <el-icon><VideoCamera /></el-icon> {{ t('director.generateFullVideo') }}
         </el-button>
         <el-button
         :loading="directorStore.generating"
@@ -122,6 +122,7 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { onMounted, computed, onUnmounted } from 'vue'
 import {
   VideoCamera, Connection, Loading, Picture, VideoPlay,

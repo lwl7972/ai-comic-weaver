@@ -1,14 +1,14 @@
 <template>
   <div class="config-container">
-    <h2>配置中心</h2>
-    <p class="description">模型配置、提示词模板管理、应用全局设置</p>
+    <h2>{{ t('config.title') }}</h2>
+    <p class="description">{{ t('config.description') }}</p>
 
     <el-tabs v-model="activeTab" type="border-card">
       <!-- ========== Tab 1-4: 模型配置 ========== -->
       <el-tab-pane v-for="tab in modelTabs" :key="tab.type" :label="tab.label" :name="tab.type">
         <div class="tab-toolbar">
           <el-button type="primary" @click="openModelDialog(tab.type)">
-            新增配置
+            {{ t('common.create') }}
           </el-button>
         </div>
 
@@ -302,6 +302,7 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { Search, Loading, CircleCheckFilled, WarningFilled, CircleCloseFilled, View, Hide } from '@element-plus/icons-vue'
 import { ElMessageBox, ElMessage } from 'element-plus'

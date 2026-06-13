@@ -2,8 +2,8 @@
   <div class="storyboard-view">
     <div class="view-header">
       <div class="header-left">
-        <h2>🎬 分镜模块</h2>
-        <p class="description">三步分镜流程（解析→编辑→生成）、专业电影级参数</p>
+        <h2>{{ t('storyboard.title') }}</h2>
+        <p class="description">{{ t('storyboard.description') }}</p>
       </div>
       <div class="header-right">
         <el-button
@@ -300,6 +300,7 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { ref, onMounted, computed } from 'vue'
 import {
   Cpu, PictureFilled, Loading, Refresh, WarningFilled, Picture,

@@ -2,12 +2,12 @@
   <div class="scene-view">
     <div class="view-header">
       <div class="header-left">
-        <h2>🌄 场景模块</h2>
-        <p class="description">场景创建、四视图生成与场景风格一致性</p>
+        <h2>{{ t('scene.title') }}</h2>
+        <p class="description">{{ t('scene.description') }}</p>
       </div>
       <div class="header-right">
         <el-button type="primary" @click="showCreateDialog = true">
-          <el-icon><Plus /></el-icon> 新建场景
+          <el-icon><Plus /></el-icon> {{ t('scene.createScene') }}
         </el-button>
         <el-button
           :loading="sceneStore.generating"
@@ -30,7 +30,7 @@
             <span class="pending-desc">{{ asset.description }}</span>
           </div>
           <div class="pending-actions">
-            <el-button type="primary" size="small" @click="handleConfirmAsset(asset.id!)">确认入库</el-button>
+            <el-button type="primary" size="small" @click="handleConfirmAsset(asset.id!)">{{ t('scene.confirm') }}</el-button>
           </div>
         </div>
       </div>
@@ -183,6 +183,7 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { ref, onMounted, computed } from 'vue'
 import { Plus, Loading, Refresh } from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus'

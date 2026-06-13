@@ -177,6 +177,7 @@ export default {
   },
   config: {
     title: '⚙️ Settings',
+    description: 'Model configuration, prompt templates, global settings',
     modelConfig: 'Model Configuration',
     promptTemplate: 'Prompt Templates',
     appConfig: 'Application Settings',

@@ -3,7 +3,7 @@
     <div class="view-header">
       <div class="header-left">
         <h2>⭐ S级模块</h2>
-        <p class="description">成片合成、视频导出、水印添加</p>
+        <p class="description">{{ t('sLevel.description') }}</p>
       </div>
       <div class="header-right">
         <el-button
@@ -12,7 +12,7 @@
           :disabled="!selectedEpisodeId"
           @click="handleCompose"
         >
-          <el-icon><Film /></el-icon> 成片合成
+          <el-icon><Film /></el-icon> {{ t('sLevel.composite') }}
         </el-button>
         <el-button
           :loading="slevelStore.generating"
@@ -27,7 +27,7 @@
     <!-- Compose Card -->
     <el-card class="operation-card">
       <template #header>
-        <span>成片合成</span>
+        <span>{{ t('sLevel.composite') }}</span>
       </template>
       <div class="op-body">
         <el-form :model="composeForm" label-width="100px" style="max-width: 600px">
@@ -238,6 +238,7 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { ref, computed, watch } from 'vue'
 import { Film, Download } from '@element-plus/icons-vue'
 import { useProjectStore } from '@/stores/project'
@@ -253,7 +254,7 @@ const showExportDialog = ref(false)
 
 const projectId = computed(() => projectStore.currentProject?.id || 0)
 
-// 集数选择 - 成片合成
+// 集数选择 - {{ t('sLevel.composite') }}
 const selectedEpisodeId = ref<number | undefined>(undefined)
 
 // 集数选择 - 导出
@@ -262,7 +263,7 @@ const exportEpisodeId = ref<number | undefined>(undefined)
 // 集数选择 - 水印
 const watermarkEpisodeId = ref<number | undefined>(undefined)
 
-// 成片合成参数
+// {{ t('sLevel.composite') }}参数
 const composeForm = ref({
   addSubtitles: true,
   mixAudio: true,

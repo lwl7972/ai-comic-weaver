@@ -3,8 +3,8 @@
     <!-- Header -->
     <div class="view-header">
       <div class="header-left">
-        <h2>素材库</h2>
-        <p class="description">上传、管理项目素材，关联角色与场景</p>
+        <h2>{{ t('asset.title') }}</h2>
+        <p class="description">{{ t('asset.description') }}</p>
       </div>
       <div class="header-right">
         <el-select v-model="filterType" placeholder="素材类型" clearable style="width: 140px" @change="handleFilter">
@@ -188,6 +188,7 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { ref, computed, onMounted } from 'vue'
 import { Upload, Search, Loading, PictureFilled, Headset, VideoCamera, Document } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
