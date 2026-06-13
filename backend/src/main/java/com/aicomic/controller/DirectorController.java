@@ -1,6 +1,7 @@
 package com.aicomic.controller;
 
 import com.aicomic.common.response.ApiResponse;
+import com.aicomic.dto.VideoGenerationRequest;
 import com.aicomic.service.DirectorService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -20,6 +21,17 @@ public class DirectorController {
     @PostMapping("/episodes/{id}/generate-videos")
     public ApiResponse<Void> generateFullVideo(@PathVariable Long id) {
         directorService.generateFullVideoAsync(null, id);
+        return ApiResponse.success();
+    }
+
+    /** POST /api/v1/episodes/{id}/generate-videos-custom - 自定义参数生成整集视频 */
+    @PostMapping("/episodes/{id}/generate-videos-custom")
+    public ApiResponse<Void> generateFullVideoCustom(
+            @PathVariable Long id,
+            @RequestBody VideoGenerationRequest request
+    ) {
+        // TODO: 实现自定义参数生成
+        directorService.generateFullVideoAsync(request.getProjectId(), id);
         return ApiResponse.success();
     }
 
@@ -48,6 +60,27 @@ public class DirectorController {
         response.setVideoGenerating(vs.getVideoGenerating());
         response.setProgress(vs.getProgress());
         return ApiResponse.success(response);
+    }
+
+    /** POST /api/v1/director/queue/pause - 暂停视频生成队列 */
+    @PostMapping("/director/queue/pause")
+    public ApiResponse<Void> pauseQueue() {
+        // TODO: 实现队列暂停
+        return ApiResponse.success();
+    }
+
+    /** POST /api/v1/director/queue/resume - 恢复视频生成队列 */
+    @PostMapping("/director/queue/resume")
+    public ApiResponse<Void> resumeQueue() {
+        // TODO: 实现队列恢复
+        return ApiResponse.success();
+    }
+
+    /** DELETE /api/v1/director/tasks/{taskId} - 取消视频生成任务 */
+    @DeleteMapping("/director/tasks/{taskId}")
+    public ApiResponse<Void> cancelTask(@PathVariable Long taskId) {
+        // TODO: 实现任务取消
+        return ApiResponse.success();
     }
 
     // Inner DTO
