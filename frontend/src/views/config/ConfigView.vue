@@ -125,6 +125,23 @@
             </div>
           </template>
 
+          <!-- 开发模式提示 -->
+          <el-alert
+            v-if="!isPackaged"
+            title="开发模式"
+            type="info"
+            description="自动更新功能仅在打包后的应用中可用。开发模式下请前往 GitHub 下载最新版本。"
+            show-icon
+            :closable="false"
+            style="margin-bottom: 16px"
+          >
+            <template #default>
+              <el-button type="primary" size="small" @click="openGitHubReleases">
+                前往 GitHub Releases
+              </el-button>
+            </template>
+          </el-alert>
+
           <div class="update-section">
             <div v-if="updateState === 'idle'" class="update-state-block">
               <p class="update-hint">点击下方按钮检测是否有新版本可用</p>
@@ -780,6 +797,29 @@ const downloadPercent = ref(0)
 const newVersion = ref('')
 const newSize = ref(0)
 const errorMessage = ref('')
+const isPackaged = ref(false)
+
+/** 检测是否为打包环境 */
+function checkPackagedStatus() {
+  // Electron 生产模式下 window.electronAPI 会返回有效的 app-packaged 状态
+  if (window.electronAPI) {
+    // 通过 electronAPI 获取应用路径判断是否为打包环境
+    window.electronAPI.getAppPath?.().then((appPath: string) => {
+      isPackaged.value = !appPath.includes('node_modules') && !appPath.includes('frontend')
+    }).catch(() => {
+      // 降级处理：假设是非打包环境
+      isPackaged.value = false
+    })
+  } else {
+    // 非 Electron 环境（浏览器）
+    isPackaged.value = false
+  }
+}
+
+/** 打开 GitHub Releases 页面 */
+function openGitHubReleases() {
+  window.open('https://github.com/lwl7972/ai-comic-weaver/releases', '_blank')
+}
 
 const updateStatusTag = computed(() => {
   const map: Record<UpdateState, string> = {
@@ -895,7 +935,10 @@ function setupListeners() {
 // 生命周期
 // ============================================================
 onMounted(async () => {
-  // 加载当前Tab数据
+  // 检测打包状态
+  checkPackagedStatus()
+  
+  // 加载当前 Tab 数据
   await loadModelConfigs('TEXT')
 
   // 加载应用配置

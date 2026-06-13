@@ -30,7 +30,7 @@ public class ImageService {
     private final EpisodeRepository episodeRepository;
     private final FFmpegUtils ffmpegUtils;
 
-    @Value("${aicomic.storage.output:./output}")
+    @Value("${app.storage.output-dir:./output}")
     private String outputDir;
 
     /**

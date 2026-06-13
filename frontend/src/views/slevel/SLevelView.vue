@@ -379,7 +379,7 @@ function reloadVideo() {
 
 watch(() => slevelStore.composeStep, (step) => {
   if (step === 5) {
-    finalVideoUrl.value = `/api/v1/episodes/${selectedEpisodeId.value}/output/episode-${selectedEpisodeId.value}-final.mp4`
+    finalVideoUrl.value = `/output/projects/${projectId.value}/output/episode-${selectedEpisodeId.value}-final.mp4`
   }
 })
 </script>

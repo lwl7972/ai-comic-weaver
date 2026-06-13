@@ -1,17 +1,18 @@
-const { app, BrowserWindow, ipcMain } = require('electron')
+const { app, BrowserWindow, ipcMain, Menu, shell } = require('electron')
 const path = require('path')
 const { spawn } = require('child_process')
 const net = require('net')
 const { autoUpdater } = require('electron-updater')
 
 // ============================================================
-// AI漫剧制作平台 - Electron 主进程
+// AI 漫剧制作平台 - Electron 主进程
 // ADR-2: Electron 内嵌 JVM（spawn 子进程 + 随机端口 ADR-18）
 // ============================================================
 
-// Configure auto-updater
+// 配置自动更新器
 autoUpdater.autoDownload = false
 autoUpdater.autoInstallOnAppQuit = true
+autoUpdater.autoRunAppAfterInstall = true
 
 let mainWindow = null
 let jvmProcess = null
@@ -29,7 +30,7 @@ function createWindow() {
     height: 900,
     minWidth: 1024,
     minHeight: 700,
-    title: 'AI漫剧',
+    title: 'AI 漫剧',
     icon: path.join(__dirname, '../assets/logo.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -45,6 +46,89 @@ function createWindow() {
   } else {
     mainWindow.loadFile(path.join(__dirname, '../frontend/dist/index.html'))
   }
+
+  mainWindow.on('ready-to-show', () => {
+    mainWindow.show()
+  })
+
+  mainWindow.on('closed', () => {
+    mainWindow = null
+  })
+
+  // 创建应用菜单栏
+  createApplicationMenu()
+}
+
+/**
+ * 创建应用菜单栏（包含 Gitee/GitHub 跳转）
+ */
+function createApplicationMenu() {
+  const isMac = process.platform === 'darwin'
+  
+  const helpMenu = {
+    label: '帮助',
+    submenu: [
+      {
+        label: 'Gitee 仓库',
+        click: () => {
+          shell.openExternal('https://gitee.com/aiprojects_1/ai-comic-weaver')
+        },
+      },
+      {
+        label: 'GitHub 镜像',
+        click: () => {
+          shell.openExternal('https://github.com/lwl7972/ai-comic-weaver')
+        },
+      },
+      { type: 'separator' },
+      {
+        label: '关于 AI 漫剧',
+        click: () => {
+          const { dialog } = require('electron')
+          dialog.showMessageBox(mainWindow, {
+            type: 'info',
+            title: '关于 AI 漫剧',
+            message: 'AI 漫剧制作平台',
+            detail: '版本：0.1.0\n\n基于 AI 的漫剧创作桌面应用\n支持剧本→角色→场景→分镜→导演→成片完整流水线',
+            buttons: ['确定'],
+          })
+        },
+      },
+    ],
+  }
+
+  const menuTemplate = [
+    ...(isMac ? [{
+      label: 'AI 漫剧',
+      submenu: [
+        { role: 'about' },
+        { type: 'separator' },
+        { role: 'quit' },
+      ],
+    }] : []),
+    {
+      label: '编辑',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'pasteAndMatchStyle' },
+        { role: 'delete' },
+        { role: 'selectAll' },
+      ],
+    },
+    ...(!isMac ? [{
+      label: '帮助',
+      submenu: helpMenu.submenu,
+    }] : [helpMenu]),
+  ]
+
+  const menu = Menu.buildFromTemplate(menuTemplate)
+  Menu.setApplicationMenu(menu)
+}
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
@@ -193,7 +277,21 @@ async function detectFreePort() {
 // 自动更新 (electron-updater → GitHub Releases)
 // ============================================================
 
+let updateCheckInProgress = false
+
 function setupAutoUpdater() {
+  // 设置 GitHub 更新源（显式指定，增强可靠性）
+  try {
+    autoUpdater.setFeedURL({
+      provider: 'github',
+      owner: 'lwl7972',
+      repo: 'ai-comic-weaver',
+      releaseType: 'release'
+    })
+  } catch (err) {
+    console.error('[Updater] setFeedURL error:', err.message)
+  }
+
   // Forward updater events to renderer
   autoUpdater.on('update-available', (info) => {
     console.log('[Updater] Update available:', info.version)
@@ -222,9 +320,13 @@ function setupAutoUpdater() {
 
   // Auto-check on startup (3s delay to let UI load)
   setTimeout(() => {
-    autoUpdater.checkForUpdates().catch((err) => {
-      console.log('[Updater] Startup check skipped:', err.message)
-    })
+    if (!updateCheckInProgress) {
+      updateCheckInProgress = true
+      autoUpdater.checkForUpdates().catch((err) => {
+        console.log('[Updater] Startup check skipped:', err.message)
+        updateCheckInProgress = false
+      })
+    }
   }, 3000)
 }
 
@@ -284,10 +386,23 @@ ipcMain.handle('get-app-path', () => app.getAppPath())
 // ============================================================
 
 ipcMain.handle('check-for-update', async () => {
+  if (updateCheckInProgress) {
+    return { available: false, error: '更新检查正在进行中' }
+  }
   try {
+    updateCheckInProgress = true
     const result = await autoUpdater.checkForUpdates()
-    return { available: !!result, version: result?.updateInfo?.version || app.getVersion() }
+    updateCheckInProgress = false
+    // result.updateInfo 包含 version, files, releaseNotes 等信息
+    return {
+      available: !!result?.updateInfo,
+      version: result?.updateInfo?.version,
+      releaseDate: result?.updateInfo?.releaseDate,
+      releaseNotes: result?.updateInfo?.releaseNotes
+    }
   } catch (err) {
+    updateCheckInProgress = false
+    console.error('[Updater] checkForUpdates error:', err.message)
     return { available: false, error: err.message }
   }
 })
@@ -297,10 +412,12 @@ ipcMain.handle('download-update', async () => {
     await autoUpdater.downloadUpdate()
     return { success: true }
   } catch (err) {
+    console.error('[Updater] downloadUpdate error:', err.message)
     return { success: false, error: err.message }
   }
 })
 
 ipcMain.handle('quit-and-install', () => {
+  console.log('[Updater] Quitting and installing update...')
   autoUpdater.quitAndInstall()
 })

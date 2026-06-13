@@ -434,25 +434,6 @@ public class SLevelService {
         return 4; // 默认 4 秒
     }
 
-        // 匹配 "起始-结束s" 格式，如 "0-4s", "2-6s"
-        Pattern pattern = Pattern.compile("(\\d+(?:\\.\\d+)?)-(\\d+(?:\\.\\d+)?)s?");
-        Matcher matcher = pattern.matcher(timeRange.trim());
-        if (matcher.find()) {
-            double start = Double.parseDouble(matcher.group(1));
-            double end = Double.parseDouble(matcher.group(2));
-            return (int) Math.ceil(end - start);
-        }
-
-        // 尝试匹配纯数字秒数，如 "4s"
-        Pattern simplePattern = Pattern.compile("(\\d+(?:\\.\\d+)?)s");
-        Matcher simpleMatcher = simplePattern.matcher(timeRange.trim());
-        if (simpleMatcher.find()) {
-            return (int) Math.ceil(Double.parseDouble(simpleMatcher.group(1)));
-        }
-
-        return 4; // 默认4秒
-    }
-
     /**
      * 清理对话文本中的格式标记
      * 去除 [角色名, 情绪]: 等前缀，只保留台词内容

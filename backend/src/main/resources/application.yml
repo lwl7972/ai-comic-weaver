@@ -34,10 +34,13 @@ spring:
 # File storage paths
 app:
   storage:
-    base-dir: ./data/uploads
+    base-dir: ./data
+    path: ./data
     temp-dir: ./data/temp
     generated-dir: ./data/generated
+    output-dir: ./data/output
     backup-dir: ./data/backups
+    uploads-dir: ./data/uploads
   # Random port for Electron spawn mode (overridden at runtime by main process)
   random-port: ${RANDOM_PORT:8080}
 

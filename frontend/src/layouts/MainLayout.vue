@@ -89,44 +89,10 @@
             <el-icon><Setting /></el-icon>
             <span>{{ t('nav.config') }}</span>
           </el-menu-item>
-          <el-menu-item index="/script">
-            <el-icon><Document /></el-icon>
-            <span>剧本</span>
-            <span v-if="pipelineStore.isScriptDirty" class="dirty-dot" />
-          </el-menu-item>
-          <el-menu-item index="/character">
-            <el-icon><UserFilled /></el-icon>
-            <span>角色</span>
-            <span v-if="pipelineStore.isCharacterDirty" class="dirty-dot" />
-          </el-menu-item>
-          <el-menu-item index="/scene">
-            <el-icon><PictureFilled /></el-icon>
-            <span>场景</span>
-            <span v-if="pipelineStore.isSceneDirty" class="dirty-dot" />
-          </el-menu-item>
-          <el-menu-item index="/storyboard">
-            <el-icon><Film /></el-icon>
-            <span>分镜</span>
-            <span v-if="pipelineStore.isStoryboardDirty" class="dirty-dot" />
-          </el-menu-item>
-          <el-menu-item index="/director">
-            <el-icon><VideoCamera /></el-icon>
-            <span>导演</span>
-            <span v-if="pipelineStore.isDirectorDirty" class="dirty-dot" />
-          </el-menu-item>
-          <el-menu-item index="/s-level">
-            <el-icon><Star /></el-icon>
-            <span>S级</span>
-            <span v-if="pipelineStore.isOutputDirty" class="dirty-dot" />
-          </el-menu-item>
           <el-divider border-style="dashed" />
-          <el-menu-item index="/asset">
-            <el-icon><Folder /></el-icon>
-            <span>素材库</span>
-          </el-menu-item>
-          <el-menu-item index="/config">
-            <el-icon><Setting /></el-icon>
-            <span>配置中心</span>
+          <el-menu-item @click="openGitHub">
+            <el-icon><Link /></el-icon>
+            <span>GitHub</span>
           </el-menu-item>
         </el-menu>
       </el-aside>
@@ -155,7 +121,7 @@ import { useProjectStore } from '@/stores/project'
 import type { PipelineStage } from '@/types'
 import {
   Document, UserFilled, PictureFilled, Film,
-  VideoCamera, Star, FolderOpened, Setting, Folder, ArrowDown,
+  VideoCamera, Star, FolderOpened, Setting, Folder, ArrowDown, Link,
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
@@ -185,6 +151,11 @@ const stageMap: Record<string, PipelineStage> = {
 /** 语言切换处理 */
 function handleLanguageCommand(command: string) {
   locale.value = command
+}
+
+/** 打开 GitHub 仓库 */
+function openGitHub() {
+  window.open('https://gitee.com/aiprojects_1/ai-comic-weaver', '_blank')
 }
 
 /** 菜单选择处理 - DIRTY 拦截 */

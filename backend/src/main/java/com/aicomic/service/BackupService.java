@@ -27,7 +27,7 @@ public class BackupService {
 
     private final ExportImportService exportImportService;
 
-    @Value("${aicomic.storage.backup:./backups}")
+    @Value("${app.storage.backup-dir:./backups}")
     private String backupDir;
 
     @Value("${spring.datasource.url:}")

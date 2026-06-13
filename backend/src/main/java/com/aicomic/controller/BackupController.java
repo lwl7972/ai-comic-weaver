@@ -1,6 +1,6 @@
 package com.aicomic.controller;
 
-import com.aicomic.common.dto.ApiResponse;
+import com.aicomic.common.response.ApiResponse;
 import com.aicomic.service.BackupService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -52,7 +52,13 @@ public class BackupController {
     @PostMapping("/restore")
     public ResponseEntity<ApiResponse<Void>> restoreBackup(@RequestParam String file) {
         backupService.restoreBackup(file);
-        return ResponseEntity.ok(ApiResponse.success(null, "备份恢复成功"));
+        return ResponseEntity.ok(ApiResponse.success());
+    }
+
+    @DeleteMapping("/{filename}")
+    public ResponseEntity<ApiResponse<Void>> deleteBackup(@PathVariable String filename) {
+        backupService.deleteBackup(filename);
+        return ResponseEntity.ok(ApiResponse.success());
     }
 
     /**

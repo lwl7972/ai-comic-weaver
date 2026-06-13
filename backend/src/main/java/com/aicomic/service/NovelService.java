@@ -42,7 +42,7 @@ public class NovelService {
     private final ModelCallService modelCallService;
     private final SseService sseService;
 
-    @Value("${app.storage.path:./data/uploads}")
+    @Value("${app.storage.uploads-dir:./data/uploads}")
     private String storagePath;
 
     // ==================== Basic CRUD ====================
