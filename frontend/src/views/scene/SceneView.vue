@@ -184,6 +184,7 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 import { ref, onMounted, computed } from 'vue'
 import { Plus, Loading, Refresh } from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus'

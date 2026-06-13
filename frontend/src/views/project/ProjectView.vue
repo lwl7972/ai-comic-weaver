@@ -127,6 +127,7 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Plus, DocumentCopy, Loading } from '@element-plus/icons-vue'

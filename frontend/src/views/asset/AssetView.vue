@@ -189,6 +189,7 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 import { ref, computed, onMounted } from 'vue'
 import { Upload, Search, Loading, PictureFilled, Headset, VideoCamera, Document } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'

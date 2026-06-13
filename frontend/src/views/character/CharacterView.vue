@@ -3,7 +3,7 @@
     <div class="view-header">
       <div class="header-left">
         <h2>{{ t('character.title') }}</h2>
-        <p class="description">AI资产提取、6层身份锚点、定妆图管理与角色圣经</p>
+        <p class="description">{{ t('character.description') }}</p>
       </div>
       <div class="header-right">
         <el-button type="primary" @click="showCreateDialog = true">
@@ -126,6 +126,7 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 import { ref, onMounted, computed } from 'vue'
 import { Plus, Loading, User } from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus'

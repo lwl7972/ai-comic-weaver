@@ -239,6 +239,7 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 import { ref, computed, watch } from 'vue'
 import { Film, Download } from '@element-plus/icons-vue'
 import { useProjectStore } from '@/stores/project'

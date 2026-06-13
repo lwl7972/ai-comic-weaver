@@ -303,6 +303,7 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { Search, Loading, CircleCheckFilled, WarningFilled, CircleCloseFilled, View, Hide } from '@element-plus/icons-vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
