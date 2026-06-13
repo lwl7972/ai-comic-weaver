@@ -13,20 +13,29 @@
 - ✅ 中文语言包 (300+ key)
 - ✅ ProjectView 国际化示例
 
-### 提示词模板系统
-- ✅ 10 个核心模板初始化
+### 提示词模板系统 ⭐
+- ✅ 10 个核心模板初始化（JSON 配置文件）
 - ✅ PromptTemplateInitializer 自动加载
 - ✅ PromptTemplateController REST API
-- ✅ PromptTemplateService 增强功能
+- ✅ PromptTemplateService 增强功能（批量渲染、按名查找）
+
+### 提示词模板集成 ⭐⭐
+- ✅ ScriptService 重构 (2 个方法)
+  - buildOutlinePromptWithTemplate() - 大纲生成
+  - buildEpisodeScriptPromptWithTemplate() - 剧本生成
+- ✅ NovelService 重构 (2 个方法)
+  - buildOutlinePromptWithTemplate() - 小说转大纲
+  - buildEpisodeScriptPromptWithTemplate() - 分集剧本
+- ✅ CharacterService 重构 (2 个方法)
+  - buildCharacterExtractionPromptWithTemplate() - 角色提取
+  - buildMakeupPromptWithTemplate() - 定妆图提示词
+- ✅ SceneService 重构 (1 个方法)
+  - buildSceneExtractionPromptWithTemplate() - 场景提取
+- ✅ StoryboardService 重构 (2 个方法)
+  - buildStoryboardParsePromptWithTemplate() - 分镜解析
+  - buildStoryboardImagePromptWithTemplate() - 分镜图生成
 
 ## 🔄 进行中
-
-### 提示词模板集成
-- [ ] 重构 ScriptService 使用模板渲染
-- [ ] 重构 NovelService 使用模板渲染
-- [ ] 重构 CharacterService 使用模板渲染
-- [ ] 重构 SceneService 使用模板渲染
-- [ ] 重构 StoryboardService 使用模板渲染
 
 ### S 级功能补全
 - [ ] 小说分章摘要批量处理（A.8.2）
@@ -60,4 +69,4 @@
 ---
 
 最后更新：2026-06-13
-当前优先级：提示词模板集成 > S 级功能补全 > 前端国际化
+当前优先级：S 级功能补全 > 前端国际化 > 代码优化
