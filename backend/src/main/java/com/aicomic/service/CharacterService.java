@@ -1,6 +1,7 @@
 package com.aicomic.service;
 
 import com.aicomic.common.exception.ResourceNotFoundException;
+import com.aicomic.common.event.AssetExtractedEvent;
 import com.aicomic.entity.Character;
 import com.aicomic.entity.ExtractedAsset;
 import com.aicomic.entity.Project;
@@ -17,6 +18,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -79,6 +81,16 @@ public class CharacterService {
 
     // ==================== AI Asset Extraction (ADR-4) ====================
 
+    /**
+     * 监听资产提取事件，自动触发角色提取
+     */
+    @Async("taskExecutor")
+    @EventListener(condition = "#event.assetType == 'CHARACTER'")
+    public void onAssetExtractedEvent(AssetExtractedEvent event) {
+        log.info("接收到角色提取事件：projectId={}, scriptId={}", event.getProjectId(), event.getScriptId());
+        extractCharactersAsync(event.getProjectId(), event.getScriptId());
+    }
+
     @Async("taskExecutor")
     public void extractCharactersAsync(Long projectId, Long scriptId) {
         log.info("Start AI character extraction: projectId={}, scriptId={}", projectId, scriptId);
@@ -120,32 +132,46 @@ public class CharacterService {
 
     // ==================== Makeup Image Generation (ADR-10) ====================
 
+    /**
+     * 生成角色定妆图（异步执行）
+     * ADR-10: 参考图 + Prompt 双重一致性保障
+     */
     @Async("taskExecutor")
     public void generateMakeupImageAsync(Long characterId) {
-        log.info("Start generating makeup image: characterId={}", characterId);
+        log.info("开始生成定妆图：characterId={}", characterId);
         Character character = characterRepository.findById(characterId)
                 .orElseThrow(() -> new ResourceNotFoundException("Character", characterId));
 
         try {
             sseService.pushNotification("character-progress",
-                    String.format("Generating makeup image for '%s'...", character.getName()));
+                    String.format("正在生成 '%s' 的定妆图...", character.getName()));
 
+            // ADR-10: 构建包含 6 层锚点的完整提示词
             String makeupPrompt = buildMakeupPromptWithTemplate(character);
-            String imageUrl = modelCallService.callImage(makeupPrompt, null);
+            
+            // 如果有参考图，使用图生图模式
+            String referenceImageUrl = character.getReferenceImageUrl();
+            
+            String imageUrl = modelCallService.callImage(makeupPrompt, referenceImageUrl);
 
+            character.setMakeupImageUrl(imageUrl);
             character.setAnchorPrompt(makeupPrompt);
             characterRepository.save(character);
 
             pipelineStateService.markDirty(character.getProjectId(), Project.PipelineStage.CHARACTER);
 
             sseService.pushNotification("character-completed",
-                    String.format("Makeup image for '%s' generated", character.getName()));
-            log.info("Makeup image generated: characterId={}", characterId);
+                    String.format("'%s' 的定妆图已生成", character.getName()));
+            log.info("定妆图生成完成：characterId={}, imageUrl={}", characterId, imageUrl);
 
         } catch (ModelCallException e) {
-            log.error("Makeup image generation failed: {}", e.getMessage(), e);
+            log.error("定妆图生成失败：{}", e.getMessage(), e);
             sseService.pushNotification("character-error",
-                    String.format("Makeup image for '%s' failed: %s", character.getName(), e.getMessage()));
+                    String.format("'%s' 定妆图生成失败：%s", character.getName(), e.getMessage()));
+        } catch (Exception e) {
+            log.error("定妆图生成异常：{}", e.getMessage(), e);
+            sseService.pushNotification("character-error",
+                    String.format("'%s' 定妆图生成异常：%s", character.getName(), e.getMessage()));
         }
     }
 
@@ -239,43 +265,55 @@ public class CharacterService {
     private List<ExtractedAsset> parseExtractedCharacters(String result, Long projectId) {
         List<ExtractedAsset> assets = new ArrayList<>();
         try {
-            String jsonStr = result;
-            int startIdx = result.indexOf("```json");
-            if (startIdx >= 0) {
-                startIdx += 7;
-                int endIdx = result.indexOf("```", startIdx);
-                if (endIdx > startIdx) {
-                    jsonStr = result.substring(startIdx, endIdx).trim();
-                }
-            } else if (result.contains("[")) {
-                startIdx = result.indexOf("[");
-                int endIdx = result.lastIndexOf("]") + 1;
-                jsonStr = result.substring(startIdx, endIdx);
-            }
-
+            String jsonStr = extractJsonFromResult(result);
+            
             if (jsonStr.startsWith("[")) {
                 JsonNode array = objectMapper.readTree(jsonStr);
                 if (array.isArray()) {
                     for (JsonNode node : array) {
                         assets.add(createAssetFromJson(node, projectId));
                     }
+                    log.info("成功解析 {} 个角色", assets.size());
                     return assets;
                 }
             }
         } catch (Exception e) {
-            log.debug("JSON parse failed, falling back to text parse: {}", e.getMessage());
+            log.warn("JSON 解析失败，降级为原始文本记录：{}", e.getMessage());
         }
 
         // Fallback: create raw record
         ExtractedAsset asset = new ExtractedAsset();
         asset.setProjectId(projectId);
         asset.setType(ExtractedAsset.ExtractedAssetType.CHARACTER);
-        asset.setName("Extraction result (manual processing needed)");
+        asset.setName("提取结果（需要手动处理）");
         asset.setDescription(result);
         asset.setStatus(ExtractedAsset.ExtractedStatus.PENDING);
+        asset.setExtraData("{\"parseError\": \"JSON 解析失败，请手动编辑\"}");
         assets.add(asset);
 
         return assets;
+    }
+
+    /**
+     * 从 LLM 返回结果中提取 JSON 字符串
+     */
+    private String extractJsonFromResult(String result) {
+        String jsonStr = result;
+        int startIdx = result.indexOf("```json");
+        if (startIdx >= 0) {
+            startIdx += 7;
+            int endIdx = result.indexOf("```", startIdx);
+            if (endIdx > startIdx) {
+                jsonStr = result.substring(startIdx, endIdx).trim();
+            }
+        } else if (result.contains("[")) {
+            startIdx = result.indexOf("[");
+            int endIdx = result.lastIndexOf("]") + 1;
+            if (endIdx > startIdx) {
+                jsonStr = result.substring(startIdx, endIdx);
+            }
+        }
+        return jsonStr;
     }
 
     private ExtractedAsset createAssetFromJson(JsonNode node, Long projectId) {

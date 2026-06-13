@@ -23,6 +23,14 @@ spring:
       max-file-size: 100MB
       max-request-size: 100MB
 
+  task:
+    execution:
+      pool:
+        core-size: 4
+        max-size: 8
+        queue-capacity: 50
+      thread-name-prefix: async-task-
+
 # File storage paths
 app:
   storage:
@@ -41,7 +49,7 @@ cors:
 
 logging:
   level:
-    com.aicomatic: DEBUG
+    com.aicomic: DEBUG
     org.hibernate.SQL: WARN
   file:
     name: logs/aicomic.log

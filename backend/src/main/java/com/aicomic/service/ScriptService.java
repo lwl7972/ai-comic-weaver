@@ -1,12 +1,14 @@
 package com.aicomic.service;
 
 import com.aicomic.common.exception.ResourceNotFoundException;
+import com.aicomic.common.event.AssetExtractedEvent;
 import com.aicomic.entity.*;
 import com.aicomic.repository.*;
 import com.aicomic.service.model.ModelCallException;
 import com.aicomic.service.model.ModelCallService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +33,7 @@ public class ScriptService {
     private final ModelCallService modelCallService;
     private final SseService sseService;
     private final PipelineStateService pipelineStateService;
+    private final ApplicationEventPublisher eventPublisher;
 
     // ==================== Basic CRUD ====================
 
@@ -123,6 +126,10 @@ public class ScriptService {
             sseService.pushNotification("script-completed",
                     "Outline generated: " + episodeOutlines.size() + " episodes");
             log.info("Outline generated: scriptId={}, episodes={}", scriptId, episodeOutlines.size());
+            
+            // 发布资产提取事件，自动触发角色/场景提取
+            eventPublisher.publishEvent(new AssetExtractedEvent(this, projectId, scriptId, "CHARACTER"));
+            eventPublisher.publishEvent(new AssetExtractedEvent(this, projectId, scriptId, "SCENE"));
 
         } catch (Exception e) {
             log.error("Outline generation failed: {}", e.getMessage(), e);

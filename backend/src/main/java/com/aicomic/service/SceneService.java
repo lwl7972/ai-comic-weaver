@@ -1,6 +1,7 @@
 package com.aicomic.service;
 
 import com.aicomic.common.exception.ResourceNotFoundException;
+import com.aicomic.common.event.AssetExtractedEvent;
 import com.aicomic.entity.Episode;
 import com.aicomic.entity.ExtractedAsset;
 import com.aicomic.entity.ModelConfig;
@@ -17,6 +18,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -80,6 +82,16 @@ public class SceneService {
     // ==================== AI Scene Extraction (ADR-4) ====================
 
     /**
+     * 监听资产提取事件，自动触发场景提取
+     */
+    @Async("taskExecutor")
+    @EventListener(condition = "#event.assetType == 'SCENE'")
+    public void onAssetExtractedEvent(AssetExtractedEvent event) {
+        log.info("接收到场景提取事件：projectId={}, scriptId={}", event.getProjectId(), event.getScriptId());
+        extractScenesAsync(event.getProjectId(), event.getScriptId());
+    }
+
+    /**
      * AI 自动提取场景资产（异步执行）
      * 剧本完成后自动触发 LLM 提取，生成待确认记录
      */
@@ -129,11 +141,11 @@ public class SceneService {
 
     /**
      * 生成场景四视图（异步执行）
-     * 场景确认后自动生成正面/背面/左侧/右侧四视图
+     * ADR-11: 场景确认后自动生成正面/背面/左侧/右侧四视图
      */
     @Async("taskExecutor")
     public void generateQuadViewAsync(Long sceneId) {
-        log.info("开始生成场景四视图: sceneId={}", sceneId);
+        log.info("开始生成场景四视图：sceneId={}", sceneId);
         Scene scene = sceneRepository.findById(sceneId)
                 .orElseThrow(() -> new ResourceNotFoundException("场景", sceneId));
 
@@ -141,18 +153,66 @@ public class SceneService {
             sseService.pushNotification("scene-progress",
                     String.format("正在生成场景 '%s' 的四视图...", scene.getName()));
 
-            // Generate 4 views: front, back, left, right
-            String[] views = {"front", "back", "left", "right"};
-            String[] results = new String[4];
+            // 并行生成 4 个视图，失败时记录错误但不中断其他视图
+            generateView(scene, "front", 1);
+            generateView(scene, "back", 2);
+            generateView(scene, "left", 3);
+            generateView(scene, "right", 4);
 
-            for (int i = 0; i < views.length; i++) {
-                sseService.pushNotification("scene-progress",
-                        String.format("正在生成 '%s' 的%s视图 (%d/4)...",
-                                scene.getName(), getViewLabel(views[i]), i + 1));
+            sceneRepository.save(scene);
+            pipelineStateService.markDirty(scene.getProjectId(), Project.PipelineStage.SCENE);
 
-                String viewPrompt = buildQuadViewPrompt(scene, views[i]);
-                results[i] = modelCallService.callImage(viewPrompt, null);
+            sseService.pushNotification("scene-completed",
+                    String.format("场景 '%s' 四视图生成完成", scene.getName()));
+            log.info("场景四视图生成完成：sceneId={}", sceneId);
+
+        } catch (ModelCallException e) {
+            log.error("场景四视图生成失败：{}", e.getMessage(), e);
+            sseService.pushNotification("scene-error",
+                    String.format("场景 '%s' 四视图生成失败：%s", scene.getName(), e.getMessage()));
+        } catch (Exception e) {
+            log.error("场景四视图生成异常：{}", e.getMessage(), e);
+            sseService.pushNotification("scene-error",
+                    String.format("场景 '%s' 四视图生成异常：%s", scene.getName(), e.getMessage()));
+        }
+    }
+
+    /**
+     * 生成单个视角
+     */
+    private void generateView(Scene scene, String viewType, int index) throws ModelCallException {
+        try {
+            sseService.pushNotification("scene-progress",
+                    String.format("正在生成 '%s' 的%s视图 (%d/4)...",
+                            scene.getName(), getViewLabel(viewType), index));
+
+            String viewPrompt = buildQuadViewPrompt(scene, viewType);
+            String imageUrl = modelCallService.callImage(viewPrompt, null);
+
+            // Save view URL
+            switch (viewType.toLowerCase()) {
+                case "front":
+                    scene.setFrontViewUrl(imageUrl);
+                    break;
+                case "back":
+                    scene.setBackViewUrl(imageUrl);
+                    break;
+                case "left":
+                    scene.setLeftViewUrl(imageUrl);
+                    break;
+                case "right":
+                    scene.setRightViewUrl(imageUrl);
+                    break;
             }
+            log.info("视角生成成功：{} {}", scene.getName(), getViewLabel(viewType));
+
+        } catch (ModelCallException e) {
+            log.warn("单个视角生成失败：{} {} - {}", scene.getName(), getViewLabel(viewType), e.getMessage());
+            sseService.pushNotification("scene-warning",
+                    String.format("场景 '%s' 的%s视图生成失败，可稍后重试", scene.getName(), getViewLabel(viewType)));
+            throw e;
+        }
+    }
 
             // Save quad view URLs
             scene.setFrontViewUrl(results[0]);
@@ -310,14 +370,56 @@ public class SceneService {
     private List<ExtractedAsset> parseExtractedScenes(String result, Long projectId) {
         List<ExtractedAsset> assets = new ArrayList<>();
         try {
-            String jsonStr = result;
-            int startIdx = result.indexOf("```json");
-            if (startIdx >= 0) {
-                startIdx += 7;
-                int endIdx = result.indexOf("```", startIdx);
-                if (endIdx > startIdx) {
-                    jsonStr = result.substring(startIdx, endIdx).trim();
+            String jsonStr = extractJsonFromResult(result);
+            
+            if (jsonStr.startsWith("[")) {
+                JsonNode array = objectMapper.readTree(jsonStr);
+                if (array.isArray()) {
+                    for (JsonNode node : array) {
+                        assets.add(createSceneAssetFromJson(node, projectId));
+                    }
+                    log.info("成功解析 {} 个场景", assets.size());
+                    return assets;
                 }
+            }
+        } catch (Exception e) {
+            log.warn("JSON 解析失败，降级为原始文本记录：{}", e.getMessage());
+        }
+
+        // Fallback
+        ExtractedAsset asset = new ExtractedAsset();
+        asset.setProjectId(projectId);
+        asset.setType(ExtractedAsset.ExtractedAssetType.SCENE);
+        asset.setName("场景提取结果（需手动处理）");
+        asset.setDescription(result);
+        asset.setStatus(ExtractedAsset.ExtractedStatus.PENDING);
+        asset.setExtraData("{\"parseError\": \"JSON 解析失败，请手动编辑\"}");
+        assets.add(asset);
+
+        return assets;
+    }
+
+    /**
+     * 从 LLM 返回结果中提取 JSON 字符串
+     */
+    private String extractJsonFromResult(String result) {
+        String jsonStr = result;
+        int startIdx = result.indexOf("```json");
+        if (startIdx >= 0) {
+            startIdx += 7;
+            int endIdx = result.indexOf("```", startIdx);
+            if (endIdx > startIdx) {
+                jsonStr = result.substring(startIdx, endIdx).trim();
+            }
+        } else if (result.contains("[")) {
+            startIdx = result.indexOf("[");
+            int endIdx = result.lastIndexOf("]") + 1;
+            if (endIdx > startIdx) {
+                jsonStr = result.substring(startIdx, endIdx);
+            }
+        }
+        return jsonStr;
+    }
             } else if (result.contains("[")) {
                 startIdx = result.indexOf("[");
                 int endIdx = result.lastIndexOf("]") + 1;
