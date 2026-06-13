@@ -6,22 +6,34 @@
         <img src="../assets/logo.png" alt="AI漫剧" class="header-logo" />
         <span class="header-title">AI漫剧</span>
       </div>
-      <div class="header-center">
-        <!-- Pipeline progress indicator -->
-        <el-steps :active="pipelineActiveStep" simple finish-status="success">
-          <el-step title="剧本" icon="Document" />
-          <el-step title="角色" icon="UserFilled" />
-          <el-step title="场景" icon="PictureFilled" />
-          <el-step title="分镜" icon="Film" />
-          <el-step title="导演" icon="VideoCamera" />
-          <el-step title="S级" icon="Star" />
-        </el-steps>
-      </div>
-      <div class="header-right">
-        <el-button text @click="$router.push('/config')">
-          <el-icon><Setting /></el-icon>
-        </el-button>
-      </div>
+       <div class="header-center">
+         <!-- Pipeline progress indicator -->
+         <el-steps :active="pipelineActiveStep" simple finish-status="success">
+           <el-step :title="t('pipelineStage.script')" icon="Document" />
+           <el-step :title="t('pipelineStage.character')" icon="UserFilled" />
+           <el-step :title="t('pipelineStage.scene')" icon="PictureFilled" />
+           <el-step :title="t('pipelineStage.storyboard')" icon="Film" />
+           <el-step :title="t('pipelineStage.director')" icon="VideoCamera" />
+           <el-step :title="t('pipelineStage.output')" icon="Star" />
+         </el-steps>
+       </div>
+       <div class="header-right">
+         <el-dropdown @command="handleLanguageCommand">
+           <el-button text>
+             {{ currentLang === 'zh-CN' ? '中文' : 'English' }}
+             <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+           </el-button>
+           <template #dropdown>
+             <el-dropdown-menu>
+               <el-dropdown-item command="zh-CN">中文</el-dropdown-item>
+               <el-dropdown-item command="en-US">English</el-dropdown-item>
+             </el-dropdown-menu>
+           </template>
+         </el-dropdown>
+         <el-button text @click="$router.push('/config')">
+           <el-icon><Setting /></el-icon> {{ t('config.title') }}
+         </el-button>
+       </div>
     </el-header>
 
     <el-container>
@@ -36,7 +48,46 @@
         >
           <el-menu-item index="/project">
             <el-icon><FolderOpened /></el-icon>
-            <span>项目管理</span>
+            <span>{{ t('nav.project') }}</span>
+          </el-menu-item>
+          <el-menu-item index="/script">
+            <el-icon><Document /></el-icon>
+            <span>{{ t('nav.script') }}</span>
+            <span v-if="pipelineStore.isScriptDirty" class="dirty-dot" />
+          </el-menu-item>
+          <el-menu-item index="/character">
+            <el-icon><UserFilled /></el-icon>
+            <span>{{ t('nav.character') }}</span>
+            <span v-if="pipelineStore.isCharacterDirty" class="dirty-dot" />
+          </el-menu-item>
+          <el-menu-item index="/scene">
+            <el-icon><PictureFilled /></el-icon>
+            <span>{{ t('nav.scene') }}</span>
+            <span v-if="pipelineStore.isSceneDirty" class="dirty-dot" />
+          </el-menu-item>
+          <el-menu-item index="/storyboard">
+            <el-icon><Film /></el-icon>
+            <span>{{ t('nav.storyboard') }}</span>
+            <span v-if="pipelineStore.isStoryboardDirty" class="dirty-dot" />
+          </el-menu-item>
+          <el-menu-item index="/director">
+            <el-icon><VideoCamera /></el-icon>
+            <span>{{ t('nav.director') }}</span>
+            <span v-if="pipelineStore.isDirectorDirty" class="dirty-dot" />
+          </el-menu-item>
+          <el-menu-item index="/s-level">
+            <el-icon><Star /></el-icon>
+            <span>{{ t('nav.sLevel') }}</span>
+            <span v-if="pipelineStore.isOutputDirty" class="dirty-dot" />
+          </el-menu-item>
+          <el-divider border-style="dashed" />
+          <el-menu-item index="/asset">
+            <el-icon><Folder /></el-icon>
+            <span>{{ t('nav.asset') }}</span>
+          </el-menu-item>
+          <el-menu-item index="/config">
+            <el-icon><Setting /></el-icon>
+            <span>{{ t('nav.config') }}</span>
           </el-menu-item>
           <el-menu-item index="/script">
             <el-icon><Document /></el-icon>
@@ -95,6 +146,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { ElMessageBox } from 'element-plus'
 import sseClient from '@/utils/sse'
 import { useNotificationStore } from '@/stores/notification'
@@ -103,15 +155,22 @@ import { useProjectStore } from '@/stores/project'
 import type { PipelineStage } from '@/types'
 import {
   Document, UserFilled, PictureFilled, Film,
-  VideoCamera, Star, FolderOpened, Setting, Folder,
+  VideoCamera, Star, FolderOpened, Setting, Folder, ArrowDown,
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
+const { t, locale } = useI18n()
 const currentRoute = computed(() => route.path)
 const notificationStore = useNotificationStore()
 const pipelineStore = usePipelineStore()
 const projectStore = useProjectStore()
+
+/** 语言切换 */
+const currentLang = computed(() => locale.value)
+const toggleLanguage = () => {
+  locale.value = locale.value === 'zh-CN' ? 'en-US' : 'zh-CN'
+}
 
 /** 路由路径 -> 流水线阶段映射 */
 const stageMap: Record<string, PipelineStage> = {
@@ -121,6 +180,11 @@ const stageMap: Record<string, PipelineStage> = {
   '/storyboard': 'STORYBOARD',
   '/director': 'DIRECTOR',
   '/s-level': 'OUTPUT',
+}
+
+/** 语言切换处理 */
+function handleLanguageCommand(command: string) {
+  locale.value = command
 }
 
 /** 菜单选择处理 - DIRTY 拦截 */

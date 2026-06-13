@@ -3,9 +3,18 @@
     <!-- Header -->
     <div class="view-header">
       <div class="header-left">
-        <h2>📝 剧本模块</h2>
-        <p class="description">小说导入、AI大纲生成、剧本创作与分集管理</p>
+        <h2>{{ t('script.title') }}</h2>
+        <p class="description">{{ t('script.description') }}</p>
       </div>
+      <div class="header-right">
+        <el-button type="primary" @click="showCreateDialog = true">
+          <el-icon><Plus /></el-icon> {{ t('script.createScript') }}
+        </el-button>
+        <el-button @click="showUploadDialog = true">
+          <el-icon><Upload /></el-icon> {{ t('script.importNovel') }}
+        </el-button>
+      </div>
+    </div>
       <div class="header-right">
         <el-button type="primary" @click="showCreateDialog = true">
           <el-icon><Plus /></el-icon> 新建剧本
@@ -224,12 +233,14 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Plus, Upload, Loading } from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus'
 import { useProjectStore } from '@/stores/project'
 import { useScriptStore } from '@/stores/script'
 import type { Script, Episode, Novel } from '@/types'
 
+const { t } = useI18n()
 const projectStore = useProjectStore()
 const scriptStore = useScriptStore()
 
