@@ -1,20 +1,28 @@
 package com.aicomic.service;
 
+import com.aicomic.common.event.AssetExtractedEvent;
 import com.aicomic.common.exception.ResourceNotFoundException;
-import com.aicomic.dto.CharacterCreateRequest;
-import com.aicomic.dto.CharacterUpdateRequest;
 import com.aicomic.entity.Character;
+import com.aicomic.entity.Episode;
 import com.aicomic.entity.ExtractedAsset;
+import com.aicomic.entity.ModelConfig;
 import com.aicomic.entity.Project;
+import com.aicomic.entity.Script;
+import com.aicomic.entity.PromptTemplate;
 import com.aicomic.repository.CharacterRepository;
+import com.aicomic.repository.EpisodeRepository;
 import com.aicomic.repository.ExtractedAssetRepository;
-import com.aicomic.repository.ProjectRepository;
+import com.aicomic.repository.ScriptRepository;
+import com.aicomic.service.model.ModelCallException;
+import com.aicomic.service.model.ModelCallService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,6 +47,7 @@ public class CharacterService {
     private final SseService sseService;
     private final ObjectMapper objectMapper;
     private final PipelineStateService pipelineStateService;
+    private final PromptTemplateService promptTemplateService;
 
     // ==================== Basic CRUD ====================
 
@@ -144,12 +153,8 @@ public class CharacterService {
             // ADR-10: 构建包含 6 层锚点的完整提示词
             String makeupPrompt = buildMakeupPromptWithTemplate(character);
             
-            // 如果有参考图，使用图生图模式
-            String referenceImageUrl = character.getReferenceImageUrl();
-            
-            String imageUrl = modelCallService.callImage(makeupPrompt, referenceImageUrl);
+            String imageUrl = modelCallService.callImage(makeupPrompt, null, null);
 
-            character.setMakeupImageUrl(imageUrl);
             character.setAnchorPrompt(makeupPrompt);
             characterRepository.save(character);
 
@@ -283,7 +288,6 @@ public class CharacterService {
         asset.setName("提取结果（需要手动处理）");
         asset.setDescription(result);
         asset.setStatus(ExtractedAsset.ExtractedStatus.PENDING);
-        asset.setExtraData("{\"parseError\": \"JSON 解析失败，请手动编辑\"}");
         assets.add(asset);
 
         return assets;
@@ -423,9 +427,8 @@ public class CharacterService {
             if (templateOpt.isPresent()) {
                 var template = templateOpt.get();
                 java.util.Map<String, String> variables = new java.util.HashMap<>();
-                variables.put("scriptContent", scriptContent.length() > 30000 ? 
-                    scriptContent.substring(0, 30000) + "
-...(content truncated)" : scriptContent);
+                variables.put("scriptContent", scriptContent.length() > 30000 ?
+                    scriptContent.substring(0, 30000) + "\n...(content truncated)" : scriptContent);
                 return promptTemplateService.renderTemplate(template.getId(), variables);
             }
         } catch (Exception e) {
@@ -449,7 +452,7 @@ public class CharacterService {
                 variables.put("ageRange", character.getAgeRange());
                 variables.put("appearance", character.getAppearance());
                 variables.put("personality", character.getPersonality());
-                variables.put("occupation", character.getOccupation());
+                variables.put("occupation", "");
                 return promptTemplateService.renderTemplate(template.getId(), variables);
             }
         } catch (Exception e) {

@@ -1,17 +1,32 @@
 package com.aicomic.service;
 
+import com.aicomic.common.event.AssetExtractedEvent;
 import com.aicomic.common.exception.ResourceNotFoundException;
-import com.aicomic.dto.SceneCreateRequest;
-import com.aicomic.dto.SceneUpdateRequest;
+import com.aicomic.entity.Episode;
+import com.aicomic.entity.ExtractedAsset;
+import com.aicomic.entity.ModelConfig;
+import com.aicomic.entity.Project;
 import com.aicomic.entity.Scene;
+import com.aicomic.entity.Script;
+import com.aicomic.entity.PromptTemplate;
+import com.aicomic.repository.ExtractedAssetRepository;
+import com.aicomic.repository.EpisodeRepository;
 import com.aicomic.repository.SceneRepository;
+import com.aicomic.repository.ScriptRepository;
+import com.aicomic.service.model.ModelCallException;
+import com.aicomic.service.model.ModelCallService;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -31,6 +46,7 @@ public class SceneService {
     private final SseService sseService;
     private final ObjectMapper objectMapper;
     private final PipelineStateService pipelineStateService;
+    private final PromptTemplateService promptTemplateService;
 
     // ==================== Basic CRUD ====================
 
@@ -202,26 +218,6 @@ public class SceneService {
         }
     }
 
-            // Save quad view URLs
-            scene.setFrontViewUrl(results[0]);
-            scene.setBackViewUrl(results[1]);
-            scene.setLeftViewUrl(results[2]);
-            scene.setRightViewUrl(results[3]);
-            sceneRepository.save(scene);
-
-            pipelineStateService.markDirty(scene.getProjectId(), Project.PipelineStage.SCENE);
-
-            sseService.pushNotification("scene-completed",
-                    String.format("场景 '%s' 四视图生成完成", scene.getName()));
-            log.info("场景四视图生成完成: sceneId={}", sceneId);
-
-        } catch (ModelCallException e) {
-            log.error("场景四视图生成失败: {}", e.getMessage(), e);
-            sseService.pushNotification("scene-error",
-                    String.format("场景 '%s' 四视图生成失败: %s", scene.getName(), e.getMessage()));
-        }
-    }
-
     /**
      * 重新生成单个视角
      */
@@ -381,7 +377,6 @@ public class SceneService {
         asset.setName("场景提取结果（需手动处理）");
         asset.setDescription(result);
         asset.setStatus(ExtractedAsset.ExtractedStatus.PENDING);
-        asset.setExtraData("{\"parseError\": \"JSON 解析失败，请手动编辑\"}");
         assets.add(asset);
 
         return assets;
@@ -393,45 +388,6 @@ public class SceneService {
     @Cacheable(value = "scenes", key = "'project:' + #projectId", unless = "#result.isEmpty()")
     public List<Scene> findByProjectId(Long projectId) {
         return sceneRepository.findByProjectIdOrderByNameAsc(projectId);
-    }
-        } else if (result.contains("[")) {
-            startIdx = result.indexOf("[");
-            int endIdx = result.lastIndexOf("]") + 1;
-            if (endIdx > startIdx) {
-                jsonStr = result.substring(startIdx, endIdx);
-            }
-        }
-        return jsonStr;
-    }
-            } else if (result.contains("[")) {
-                startIdx = result.indexOf("[");
-                int endIdx = result.lastIndexOf("]") + 1;
-                jsonStr = result.substring(startIdx, endIdx);
-            }
-
-            if (jsonStr.startsWith("[")) {
-                JsonNode array = objectMapper.readTree(jsonStr);
-                if (array.isArray()) {
-                    for (JsonNode node : array) {
-                        assets.add(createSceneAssetFromJson(node, projectId));
-                    }
-                    return assets;
-                }
-            }
-        } catch (Exception e) {
-            log.debug("JSON 解析失败，回退到原始文本: {}", e.getMessage());
-        }
-
-        // Fallback
-        ExtractedAsset asset = new ExtractedAsset();
-        asset.setProjectId(projectId);
-        asset.setType(ExtractedAsset.ExtractedAssetType.SCENE);
-        asset.setName("场景提取结果（需手动处理）");
-        asset.setDescription(result);
-        asset.setStatus(ExtractedAsset.ExtractedStatus.PENDING);
-        assets.add(asset);
-
-        return assets;
     }
 
     private ExtractedAsset createSceneAssetFromJson(JsonNode node, Long projectId) {
@@ -546,6 +502,40 @@ public class SceneService {
 
     // ==================== Template-based Prompt Generation ====================
 
+    private String extractJsonFromResult(String result) {
+        String jsonStr = result.trim();
+        if (jsonStr.startsWith("{")) {
+            int endIdx = jsonStr.lastIndexOf("}") + 1;
+            if (endIdx > 0) {
+                return jsonStr.substring(0, endIdx);
+            }
+        }
+        if (jsonStr.startsWith("[")) {
+            int endIdx = jsonStr.lastIndexOf("]") + 1;
+            if (endIdx > 0) {
+                return jsonStr.substring(0, endIdx);
+            }
+        }
+        int startIdx = jsonStr.indexOf("```");
+        if (startIdx != -1) {
+            startIdx = jsonStr.indexOf("\n", startIdx) + 1;
+            int endIdx = jsonStr.indexOf("```", startIdx);
+            if (endIdx != -1) {
+                jsonStr = jsonStr.substring(startIdx, endIdx).trim();
+            }
+        }
+        if (!jsonStr.startsWith("[") && !jsonStr.startsWith("{")) {
+            if (result.startsWith("[")) {
+                startIdx = result.indexOf("[");
+                int endIdx = result.lastIndexOf("]") + 1;
+                if (endIdx > startIdx) {
+                    jsonStr = result.substring(startIdx, endIdx);
+                }
+            }
+        }
+        return jsonStr;
+    }
+
     /**
      * 构建场景提取提示词（使用模板）
      */
@@ -556,9 +546,8 @@ public class SceneService {
             if (templateOpt.isPresent()) {
                 var template = templateOpt.get();
                 java.util.Map<String, String> variables = new java.util.HashMap<>();
-                variables.put("scriptContent", scriptContent.length() > 30000 ? 
-                    scriptContent.substring(0, 30000) + "
-...(content truncated)" : scriptContent);
+                variables.put("scriptContent", scriptContent.length() > 30000 ?
+                    scriptContent.substring(0, 30000) + "\n...(content truncated)" : scriptContent);
                 return promptTemplateService.renderTemplate(template.getId(), variables);
             }
         } catch (Exception e) {

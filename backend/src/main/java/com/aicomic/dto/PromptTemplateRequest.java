@@ -3,8 +3,8 @@ package com.aicomic.dto;
 import com.aicomic.entity.PromptTemplate;
 import lombok.Data;
 
-import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.Size;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 /**
  * 提示词模板创建/更新请求 DTO - 防止客户端篡改 id/version/createdAt 等字段

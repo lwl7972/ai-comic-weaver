@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.PriorityQueue;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -44,8 +45,8 @@ public class VideoTaskQueueManager {
 
     public VideoTaskQueueManager() {
         this.taskQueue = new PriorityQueue<>(
-                Comparator.comparingInt(task -> -task.getPriority().getWeight())
-                        .thenComparing(VideoGenerationTask::getSubmittedAt)
+                Comparator.<VideoGenerationTask>comparingInt(task -> -task.getPriority().getWeight())
+                        .thenComparing(Comparator.comparing(VideoGenerationTask::getSubmittedAt))
         );
         this.allTasks = new ConcurrentHashMap<>();
         this.runningTasks = new ConcurrentHashMap<>();

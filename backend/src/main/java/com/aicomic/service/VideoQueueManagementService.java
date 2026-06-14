@@ -6,7 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.util.Map;
+import java.util.List;
 
 /**
  * 视频队列管理服务
@@ -24,7 +24,7 @@ public class VideoQueueManagementService {
      */
     public void pauseQueue() {
         log.info("暂停视频生成队列");
-        queueManager.setPaused(true);
+        queueManager.pause();
     }
 
     /**
@@ -32,7 +32,7 @@ public class VideoQueueManagementService {
      */
     public void resumeQueue() {
         log.info("恢复视频生成队列");
-        queueManager.setPaused(false);
+        queueManager.resume();
     }
 
     /**
@@ -42,10 +42,9 @@ public class VideoQueueManagementService {
      */
     public void cancelTask(Long episodeId) {
         log.info("取消视频生成任务：episodeId={}", episodeId);
-        VideoGenerationTask task = queueManager.getTask(episodeId);
+        VideoGenerationTask task = queueManager.getTask(episodeId.toString());
         if (task != null) {
-            task.setCancelled(true);
-            queueManager.removeTask(episodeId);
+            task.cancel();
         }
     }
 
@@ -56,9 +55,9 @@ public class VideoQueueManagementService {
      * @return 任务状态
      */
     public VideoGenerationTask.TaskStatus getTaskStatus(Long episodeId) {
-        VideoGenerationTask task = queueManager.getTask(episodeId);
+        VideoGenerationTask task = queueManager.getTask(episodeId.toString());
         if (task == null) {
-            return VideoGenerationTask.TaskStatus.NOT_FOUND;
+            return null;
         }
         return task.getStatus();
     }
@@ -66,9 +65,9 @@ public class VideoQueueManagementService {
     /**
      * 获取所有任务状态
      *
-     * @return 任务状态 Map
+     * @return 任务列表
      */
-    public Map<Long, VideoGenerationTask> getAllTasks() {
+    public List<VideoGenerationTask> getAllTasks() {
         return queueManager.getAllTasks();
     }
 
@@ -78,14 +77,6 @@ public class VideoQueueManagementService {
      * @return 任务数量
      */
     public int getQueueSize() {
-        return queueManager.getQueueSize();
-    }
-
-    /**
-     * 清除已完成的任务
-     */
-    public void clearCompletedTasks() {
-        log.info("清除已完成的任务");
-        queueManager.clearCompletedTasks();
+        return queueManager.getQueueStats().getPendingCount();
     }
 }

@@ -3,8 +3,8 @@ package com.aicomic.dto;
 import com.aicomic.entity.Project;
 import lombok.Data;
 
-import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.Size;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 /**
  * 项目创建/更新请求 DTO - 只暴露业务字段，防止客户端篡改 id/timestamp 等内部字段

@@ -100,7 +100,7 @@ public class DirectorController {
     @DeleteMapping("/director/tasks/{taskId}")
     public ApiResponse<Void> cancelTask(@PathVariable String taskId) {
         boolean cancelled = directorService.cancelTask(taskId);
-        return cancelled ? ApiResponse.success() : ApiResponse.error("任务取消失败或不存在");
+        return cancelled ? ApiResponse.success() : ApiResponse.error(500, "任务取消失败或不存在");
     }
 
     /** GET /api/v1/director/tasks/{taskId} - 获取任务详情 */
@@ -108,7 +108,7 @@ public class DirectorController {
     public ApiResponse<VideoGenerationResponse> getTaskInfo(@PathVariable String taskId) {
         VideoGenerationTask task = directorService.getTaskInfo(taskId);
         if (task == null) {
-            return ApiResponse.error("任务不存在");
+            return ApiResponse.error(404, "任务不存在");
         }
         VideoGenerationResponse response = convertToResponse(task);
         return ApiResponse.success(response);

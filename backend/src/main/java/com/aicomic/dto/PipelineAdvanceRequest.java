@@ -3,7 +3,7 @@ package com.aicomic.dto;
 import com.aicomic.entity.Project;
 import lombok.Data;
 
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotNull;
 
 /**
  * 流水线阶段推进请求 DTO

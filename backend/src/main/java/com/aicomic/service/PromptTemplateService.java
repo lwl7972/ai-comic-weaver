@@ -252,7 +252,6 @@ public class PromptTemplateService {
             return new LinkedHashSet<>();
         }
     }
-}
 
     /**
      * 批量渲染多个模板
@@ -305,3 +304,4 @@ public class PromptTemplateService {
         enhancedVars.put("cameraDirection", cameraDirection);
         return renderTemplate(templateId, enhancedVars);
     }
+}

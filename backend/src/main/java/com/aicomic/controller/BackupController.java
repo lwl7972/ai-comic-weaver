@@ -62,15 +62,6 @@ public class BackupController {
     }
 
     /**
-     * 删除备份
-     */
-    @DeleteMapping("/{filename}")
-    public ResponseEntity<ApiResponse<Void>> deleteBackup(@PathVariable String filename) {
-        backupService.deleteBackup(filename);
-        return ResponseEntity.ok(ApiResponse.success(null, "备份删除成功"));
-    }
-
-    /**
      * 备份响应 DTO
      */
     public record BackupResponse(String filePath, String message) {

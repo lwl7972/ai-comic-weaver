@@ -37,12 +37,16 @@ public class VideoGenerationStrategyService {
 
         try {
             Storyboard firstStoryboard = storyboards.get(0);
-            VideoResponse response = modelCallService.callVideo(episode.getId(), firstStoryboard);
+            String videoUrl = modelCallService.callVideo(
+                    "Full episode animation for " + episode.getTitle(),
+                    null,
+                    null
+            );
 
-            if (response != null && response.getUrl() != null) {
+            if (videoUrl != null) {
                 log.info("整集生成成功，应用到所有分镜");
                 for (Storyboard sb : storyboards) {
-                    sb.setGeneratedVideoUrl(response.getUrl());
+                    sb.setGeneratedVideoUrl(videoUrl);
                     sb.setStatus(Storyboard.StoryboardStatus.VIDEO_DONE);
                     storyboardRepository.save(sb);
                 }
@@ -68,13 +72,15 @@ public class VideoGenerationStrategyService {
                 log.info("生成单镜头：storyboardId={}, sequence={}",
                         storyboard.getId(), storyboard.getSequence());
 
-                VideoResponse response = modelCallService.callVideo(
-                        storyboard.getEpisodeId(),
-                        storyboard
+                VideoResponse response = null;
+                String videoUrl = modelCallService.callVideo(
+                        storyboard.getAction() != null ? storyboard.getAction() : "animation",
+                        null,
+                        null
                 );
 
-                if (response != null && response.getUrl() != null) {
-                    storyboard.setGeneratedVideoUrl(response.getUrl());
+                if (videoUrl != null) {
+                    storyboard.setGeneratedVideoUrl(videoUrl);
                     storyboard.setStatus(Storyboard.StoryboardStatus.VIDEO_DONE);
                     storyboardRepository.save(storyboard);
                     log.info("单镜头生成成功：storyboardId={}", storyboard.getId());
@@ -105,13 +111,15 @@ public class VideoGenerationStrategyService {
         try {
             log.info("重新生成单镜头：storyboardId={}", storyboardId);
 
-            VideoResponse response = modelCallService.callVideo(
-                    storyboard.getEpisodeId(),
-                    storyboard
+            VideoResponse response = null;
+            String videoUrl = modelCallService.callVideo(
+                    storyboard.getAction() != null ? storyboard.getAction() : "animation",
+                    null,
+                    null
             );
 
-            if (response != null && response.getUrl() != null) {
-                storyboard.setGeneratedVideoUrl(response.getUrl());
+            if (videoUrl != null) {
+                storyboard.setGeneratedVideoUrl(videoUrl);
                 storyboard.setStatus(Storyboard.StoryboardStatus.VIDEO_DONE);
                 storyboardRepository.save(storyboard);
                 log.info("单镜头重新生成成功：storyboardId={}", storyboardId);

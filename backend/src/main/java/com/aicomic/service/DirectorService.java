@@ -183,21 +183,6 @@ public class DirectorService {
             return null;
         }
     }
-        log.info("开始 FFmpeg 拼接: fragmentCount={}", fragmentUrls.size());
-        sseService.pushNotification("director-progress",
-                String.format("正在用 FFmpeg 拼接 %d 个视频片段...", fragmentUrls.size()));
-        try {
-            Path workDir = Files.createTempDirectory("ffmpeg_concat_");
-            String outputPath = workDir + "/concat_result.mp4";
-            ffmpegUtils.concatVideos(fragmentUrls, outputPath);
-            log.info("FFmpeg 拼接完成: {}", outputPath);
-            return outputPath;
-        } catch (Exception e) {
-            log.error("FFmpeg 拼接失败: {}", e.getMessage(), e);
-            sseService.pushNotification("director-error", "FFmpeg拼接失败: " + e.getMessage());
-            return null;
-        }
-    }
 
     /**
      * 拼接指定剧集的所有视频片段
@@ -406,11 +391,9 @@ public class DirectorService {
             case TILT_DOWN: return "tilt down";
             case ZOOM_IN: return "zoom in";
             case ZOOM_OUT: return "zoom out";
-            case DOLLY_IN: return "dolly in";
-            case DOLLY_OUT: return "dolly out";
             case TRACKING: return "tracking shot";
             case CRANE: return "crane shot";
-            case ORBIT: return "orbit shot";
+            case HANDHELD: return "handheld shot";
             default: return "";
         }
     }
@@ -421,7 +404,7 @@ public class DirectorService {
      * 提交自定义参数的视频生成任务
      */
     public VideoGenerationRequest submitVideoGeneration(VideoGenerationRequest request) {
-        videoTaskQueueManager.start();
+        queueManager.start();
         
         Priority priority = Priority.MEDIUM;
         if (request.getPriority() != null) {
@@ -615,6 +598,20 @@ public class DirectorService {
                 if (currentFailureRate >= FAILURE_THRESHOLD && i >= 2) {
                     log.warn("失败率已达 {}% (阈值 {}%)，停止生成：success={}, failure={}", 
                             currentFailureRate, FAILURE_THRESHOLD, successCount, failureCount);
-                    sseService.pushNotification("director-error", 
-                            String.format("失败率过高 (%d%%)，已停止生成。成功：%d, 失败：%d", 
+                    sseService.pushNotification("director-error",
+                            String.format("失败率过高 (%d%%)，已停止生成。成功：%d, 失败：%d",
                                     currentFailureRate, successCount, failureCount));
+                    break;
+                }
+            }
+
+            try {
+                generateShotVideoInternal(sb);
+                successCount++;
+            } catch (Exception e) {
+                failureCount++;
+                log.error("分镜 #{} 生成失败: {}", sb.getSequence() + 1, e.getMessage());
+            }
+        }
+    }
+}

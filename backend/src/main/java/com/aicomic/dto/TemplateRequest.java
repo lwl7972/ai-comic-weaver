@@ -3,8 +3,8 @@ package com.aicomic.dto;
 import com.aicomic.entity.ProjectTemplate;
 import lombok.Data;
 
-import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.Size;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 /**
  * 模板创建/更新请求 DTO

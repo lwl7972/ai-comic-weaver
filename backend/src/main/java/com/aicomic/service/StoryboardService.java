@@ -8,6 +8,7 @@ import com.aicomic.entity.ModelConfig;
 import com.aicomic.entity.Project;
 import com.aicomic.entity.Scene;
 import com.aicomic.entity.Storyboard;
+import com.aicomic.entity.PromptTemplate;
 import com.aicomic.repository.CharacterRepository;
 import com.aicomic.repository.SceneRepository;
 import com.aicomic.repository.StoryboardRepository;
@@ -44,6 +45,7 @@ public class StoryboardService {
     private final SseService sseService;
     private final ObjectMapper objectMapper;
     private final PipelineStateService pipelineStateService;
+    private final PromptTemplateService promptTemplateService;
 
     // ==================== Basic CRUD ====================
 
@@ -567,6 +569,7 @@ public class StoryboardService {
             pipelineStateService.markDirty(projectId, Project.PipelineStage.STORYBOARD);
         }
         return saved;
+    }
 
     // ==================== Template-based Prompt Generation ====================
 
@@ -580,8 +583,7 @@ public class StoryboardService {
             if (templateOpt.isPresent()) {
                 var template = templateOpt.get();
                 java.util.Map<String, String> variables = new java.util.HashMap<>();
-                variables.put("sceneContent", "第" + episode.getEpisodeNumber() + "集：" + episode.getTitle() + "
-" + episode.getScriptContent());
+                variables.put("sceneContent", "第" + episode.getEpisodeNumber() + "集：" + episode.getTitle() + "\n" + episode.getScriptContent());
                 variables.put("characters", "待提取");
                 return promptTemplateService.renderTemplate(template.getId(), variables);
             }
@@ -622,7 +624,5 @@ public class StoryboardService {
             log.warn("模板渲染失败，使用硬编码提示词：{}", e.getMessage());
         }
         return buildStoryboardImagePromptWithTemplate(sb, projectId);
-    }
-
     }
 }
