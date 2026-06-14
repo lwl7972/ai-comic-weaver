@@ -15,15 +15,6 @@
         </el-button>
       </div>
     </div>
-      <div class="header-right">
-        <el-button type="primary" @click="showCreateDialog = true">
-          <el-icon><Plus /></el-icon> 新建剧本
-        </el-button>
-        <el-button @click="showUploadDialog = true">
-          <el-icon><Upload /></el-icon> 导入小说
-        </el-button>
-      </div>
-    </div>
 
     <el-row :gutter="16">
       <!-- Left: Script List -->
