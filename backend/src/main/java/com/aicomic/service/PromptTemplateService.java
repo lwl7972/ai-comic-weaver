@@ -305,4 +305,3 @@ public class PromptTemplateService {
         enhancedVars.put("cameraDirection", cameraDirection);
         return renderTemplate(templateId, enhancedVars);
     }
-}
