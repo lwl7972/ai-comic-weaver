@@ -629,7 +629,7 @@ async function loadPromptTemplates(category?: string) {
     const params: Record<string, string> = {}
     if (category) params.category = category
     const res = await http.get('/v1/prompt-templates', { params })
-    promptTemplates.value = res.data?.data ?? res.data ?? []
+    promptTemplates.value = res.data ?? []
   } catch (e: any) {
     notify.error('加载失败', e.message || '获取提示词模板失败')
   } finally {
