@@ -43,7 +43,11 @@ jobs:
           cd backend
           mvn clean package -DskipTests -B
           # 重命名为固定名称（Electron 期望此名称）
-          Copy-Item -Path target\ai-comic-platform-0.1.0.jar -Destination target\ai-comic-platform.jar -Force
+          Copy-Item -Path "target\ai-comic-platform-0.1.0.jar" -Destination "target\ai-comic-platform.jar" -Force
+          
+          # 验证构建产物
+          Write-Host "=== 构建产物列表 ==="
+          Get-ChildItem -Path target\*.jar
         shell: pwsh
 
       # ============================================================
