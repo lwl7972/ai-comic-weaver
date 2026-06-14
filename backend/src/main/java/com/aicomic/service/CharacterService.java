@@ -296,13 +296,50 @@ public class CharacterService {
     public List<Character> findByProjectId(Long projectId) {
         return characterRepository.findByProjectIdOrderByNameAsc(projectId);
     }
-        } else if (result.contains("[")) {
-            startIdx = result.indexOf("[");
-            int endIdx = result.lastIndexOf("]") + 1;
-            if (endIdx > startIdx) {
-                jsonStr = result.substring(startIdx, endIdx);
+
+    /**
+     * 从 AI 响应结果中提取 JSON 字符串
+     */
+    private String extractJsonFromResult(String result) {
+        String jsonStr = result.trim();
+        
+        // 如果是 { 开头，直接返回
+        if (jsonStr.startsWith("{")) {
+            int endIdx = jsonStr.lastIndexOf("}") + 1;
+            if (endIdx > 0) {
+                return jsonStr.substring(0, endIdx);
             }
         }
+        
+        // 如果是 [ 开头，直接返回
+        if (jsonStr.startsWith("[")) {
+            int endIdx = jsonStr.lastIndexOf("]") + 1;
+            if (endIdx > 0) {
+                return jsonStr.substring(0, endIdx);
+            }
+        }
+        
+        // 否则尝试从 markdown code block 中提取
+        int startIdx = jsonStr.indexOf("```");
+        if (startIdx != -1) {
+            startIdx = jsonStr.indexOf("\n", startIdx) + 1;
+            int endIdx = jsonStr.indexOf("```", startIdx);
+            if (endIdx != -1) {
+                jsonStr = jsonStr.substring(startIdx, endIdx).trim();
+            }
+        }
+        
+        // 如果还是没找到，尝试查找 [ 或 { 的位置
+        if (!jsonStr.startsWith("[") && !jsonStr.startsWith("{")) {
+            if (result.startsWith("[")) {
+                startIdx = result.indexOf("[");
+                int endIdx = result.lastIndexOf("]") + 1;
+                if (endIdx > startIdx) {
+                    jsonStr = result.substring(startIdx, endIdx);
+                }
+            }
+        }
+        
         return jsonStr;
     }
 

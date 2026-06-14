@@ -657,7 +657,11 @@ public class FFmpegUtils {
             throw new RuntimeException("FFmpeg 执行被中断", e);
         }
     }
-}
-                .replace("%", "\\\\%");
+
+    /**
+     * 转义 FFmpeg 路径中的特殊字符
+     */
+    private static String escapePath(String path) {
+        return path.replace("%", "\\\\%");
     }
 }
