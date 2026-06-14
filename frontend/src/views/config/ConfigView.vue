@@ -803,13 +803,7 @@ const isPackaged = ref(false)
 function checkPackagedStatus() {
   // Electron 生产模式下 window.electronAPI 会返回有效的 app-packaged 状态
   if (window.electronAPI) {
-    // 通过 electronAPI 获取应用路径判断是否为打包环境
-    window.electronAPI.getAppPath?.().then((appPath: string) => {
-      isPackaged.value = !appPath.includes('node_modules') && !appPath.includes('frontend')
-    }).catch(() => {
-      // 降级处理：假设是非打包环境
-      isPackaged.value = false
-    })
+    isPackaged.value = true
   } else {
     // 非 Electron 环境（浏览器）
     isPackaged.value = false

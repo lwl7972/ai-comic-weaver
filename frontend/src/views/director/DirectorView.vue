@@ -224,17 +224,13 @@ import { useProjectStore } from '@/stores/project'
 import { useDirectorStore } from '@/stores/director'
 import { useStoryboardStore } from '@/stores/storyboard'
 import { useSceneStore } from '@/stores/scene'
+import { useNotificationStore } from '@/stores/notification'
 import type { Storyboard } from '@/types'
 
 const projectStore = useProjectStore()
 const directorStore = useDirectorStore()
 const storyboardStore = useStoryboardStore()
 const sceneStore = useSceneStore()
-
-function parseCharacterIds(jsonStr: string | undefined): number[] {
-  if (!jsonStr) return []
-  try { return JSON.parse(jsonStr) } catch { return [] }
-}
 
 function getSceneUrl(sb: Storyboard): string | undefined {
   if (!sb.involvedSceneId) return undefined

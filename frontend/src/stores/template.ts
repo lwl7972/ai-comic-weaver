@@ -2,14 +2,14 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import http from '@/utils/http'
 import { useNotificationStore } from './notification'
-import type { ProjectTemplate } from '@/types'
+import type { PromptTemplate } from '@/types'
 
 /**
  * 项目模板 Store - 管理模板列表与从模板创建项目
  */
 export const useTemplateStore = defineStore('template', () => {
-  const templateList = ref<ProjectTemplate[]>([])
-  const currentTemplate = ref<ProjectTemplate | null>(null)
+  const templateList = ref<PromptTemplate[]>([])
+  const currentTemplate = ref<PromptTemplate | null>(null)
   const loading = ref(false)
 
   async function fetchTemplates(type?: string) {
@@ -31,7 +31,7 @@ export const useTemplateStore = defineStore('template', () => {
     try {
       const res = await http.get(`/v1/templates/${id}`)
       currentTemplate.value = res.data
-      return res.data as ProjectTemplate
+      return res.data as PromptTemplate
     } catch (err: any) {
       useNotificationStore().error('加载模板详情失败', err.message)
       throw err
@@ -40,22 +40,22 @@ export const useTemplateStore = defineStore('template', () => {
     }
   }
 
-  async function createTemplate(data: Partial<ProjectTemplate>) {
+  async function createTemplate(data: Partial<PromptTemplate>) {
     try {
       const res = await http.post('/v1/templates', data)
       useNotificationStore().success('模板创建成功')
-      return res.data as ProjectTemplate
+      return res.data as PromptTemplate
     } catch (err: any) {
       useNotificationStore().error('创建模板失败', err.message)
       throw err
     }
   }
 
-  async function updateTemplate(id: number, data: Partial<ProjectTemplate>) {
+  async function updateTemplate(id: number, data: Partial<PromptTemplate>) {
     try {
       const res = await http.put(`/v1/templates/${id}`, data)
       useNotificationStore().success('模板更新成功')
-      return res.data as ProjectTemplate
+      return res.data as PromptTemplate
     } catch (err: any) {
       useNotificationStore().error('更新模板失败', err.message)
       throw err

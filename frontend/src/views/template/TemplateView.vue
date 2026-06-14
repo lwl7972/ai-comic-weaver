@@ -139,7 +139,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { Plus } from '@element-plus/icons-vue'
 import { useTemplateStore } from '@/stores/template'
-import type { ProjectTemplate } from '@/types'
+import type { PromptTemplate } from '@/types'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 
@@ -147,14 +147,14 @@ const templateStore = useTemplateStore()
 
 const searchQuery = ref('')
 const showCreateDialog = ref(false)
-const editingTemplate = ref<ProjectTemplate | null>(null)
+const editingTemplate = ref<PromptTemplate | null>(null)
 const submitting = ref(false)
 const formRef = ref<FormInstance>()
 
-const form = ref<Partial<ProjectTemplate>>({
+const form = ref<Partial<PromptTemplate>>({
   name: '',
   type: 'SCRIPT',
-  category: '',
+  category: 'SCRIPT',
   content: '',
   description: '',
   variables: '',
@@ -208,7 +208,7 @@ function handleCreate() {
   form.value = {
     name: '',
     type: 'SCRIPT',
-    category: '',
+    category: 'SCRIPT',
     content: '',
     description: '',
     variables: '',
@@ -217,7 +217,7 @@ function handleCreate() {
   showCreateDialog.value = true
 }
 
-function handleEdit(template: ProjectTemplate) {
+function handleEdit(template: PromptTemplate) {
   editingTemplate.value = template
   form.value = { ...template }
   showCreateDialog.value = true
@@ -244,7 +244,7 @@ async function handleSubmit() {
   })
 }
 
-async function handleDelete(template: ProjectTemplate) {
+async function handleDelete(template: PromptTemplate) {
   if (template.isSystem) {
     ElMessage.warning('系统模板不可删除')
     return

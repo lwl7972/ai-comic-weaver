@@ -77,7 +77,7 @@
               </template>
               <p class="template-card__desc">{{ tpl.description || '暂无描述' }}</p>
               <div class="template-card__meta">
-                <el-tag size="small" :type="getStyleTagType(tpl.style)">{{ getStyleLabel(tpl.style) }}</el-tag>
+                <el-tag size="small" :type="getStyleTagType(tpl.style ?? '')">{{ getStyleLabel(tpl.style ?? '') }}</el-tag>
                 <span class="template-card__count">使用 {{ tpl.useCount }} 次</span>
               </div>
             </el-card>
@@ -258,7 +258,7 @@ async function handleCreateFromTemplate() {
       templateProjectForm.value.name,
       templateProjectForm.value.description,
     )
-    notification.success('{{ t('project.createFromTemplate') }}项目成功')
+    notification.success(`${t('project.createFromTemplate')}项目成功`)
     showTemplateDialog.value = false
     await projectStore.fetchProjects()
     projects.value = projectStore.projectList as unknown as ProjectItem[]

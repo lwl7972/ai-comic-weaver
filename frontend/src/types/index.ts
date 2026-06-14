@@ -309,11 +309,17 @@ export interface PromptTemplate {
   name: string
   category: TemplateCategory  // SCRIPT / CHARACTER / SCENE / STORYBOARD / SYSTEM
   content: string             // prompt template with placeholders
-  variables: string           // JSON array of variable names
-  version: number
-  isDefault: boolean
-  createdAt: string
-  updatedAt: string
+  variables?: string          // JSON array of variable names
+  version?: number
+  isDefault?: boolean
+  isSystem?: boolean
+  isBuiltin?: boolean
+  type?: string
+  style?: string
+  description?: string
+  useCount?: number
+  createdAt?: string
+  updatedAt?: string
 }
 
 export type TemplateCategory = 'SCRIPT' | 'CHARACTER' | 'SCENE' | 'STORYBOARD' | 'SYSTEM'
