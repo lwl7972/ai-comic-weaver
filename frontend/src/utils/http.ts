@@ -9,6 +9,14 @@ import { ElMessage } from 'element-plus'
  */
 const baseURL = import.meta.env.VITE_API_BASE_URL || '/api'
 
+/** 前端日志：写入主进程文件 */
+function appLog(level: string, message: string) {
+  console[level === 'ERROR' ? 'error' : 'log'](`[${level}] ${message}`)
+  try {
+    (window as any).electronAPI?.log?.(level, message)
+  } catch {}
+}
+
 const http: AxiosInstance = axios.create({
   baseURL,
   timeout: 30000,
@@ -29,8 +37,10 @@ http.interceptors.request.use(async (config) => {
     }
     config.baseURL = `http://localhost:${cachedBackendPort}/api`
   }
+  appLog('INFO', `→ ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`)
   return config
 }, (error) => {
+  appLog('ERROR', `→ Request error: ${error.message}`)
   return Promise.reject(error)
 })
 
@@ -69,13 +79,16 @@ function classifyError(error: AxiosError): string {
 http.interceptors.response.use(
   (response) => {
     const { code, message, data } = response.data
+    appLog('INFO', `← ${response.status} ${response.config.url} code=${code}`)
     if (code === 0) return { ...response, data }
     // Business error: reject without toast — let Store decide how to display
     const msg = message || '请求失败'
+    appLog('ERROR', `← Business error: ${response.config.url} msg=${msg}`)
     return Promise.reject(new Error(msg))
   },
   (error: AxiosError) => {
     const msg = classifyError(error)
+    appLog('ERROR', `← ${error.config?.url || 'unknown'} ${error.response?.status || 'network'} ${msg}`)
     // Only show toast for non-cancelled requests with a message
     // Store-level handlers will also show notifications, so we keep this
     // as a fallback for unhandled cases (e.g. 401/403/502)

@@ -194,7 +194,10 @@
             <div v-else-if="updateState === 'error'" class="update-state-block">
               <el-icon :size="24" color="#f56c6c"><CircleCloseFilled /></el-icon>
               <p>{{ errorMessage }}</p>
-              <el-button @click="retryUpdate">重试</el-button>
+              <div class="update-actions">
+                <el-button @click="retryUpdate">重试</el-button>
+                <el-button type="primary" plain @click="openGitHubReleases">前往网页下载</el-button>
+              </div>
             </div>
           </div>
         </el-card>

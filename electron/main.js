@@ -1,8 +1,23 @@
 const { app, BrowserWindow, ipcMain, Menu, shell } = require('electron')
 const path = require('path')
+const fs = require('fs')
 const { spawn } = require('child_process')
 const net = require('net')
 const { autoUpdater } = require('electron-updater')
+
+// ============================================================
+// 本地日志系统
+// ============================================================
+const LOG_DIR = path.join(app.getPath('userData'), 'logs')
+if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR, { recursive: true })
+
+function logToFile(level, ...args) {
+  const line = `[${new Date().toISOString()}] [${level}] ${args.join(' ')}\n`
+  const logFile = path.join(LOG_DIR, `app-${new Date().toISOString().slice(0, 10)}.log`)
+  try { fs.appendFileSync(logFile, line) } catch {}
+  if (level === 'ERROR') console.error(...args)
+  else console.log(...args)
+}
 
 // ============================================================
 // AI 漫剧制作平台 - Electron 主进程
@@ -49,6 +64,14 @@ function createWindow() {
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
+  })
+
+  // F12 切换开发者工具（所有模式可用）
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.key === 'F12' && input.type === 'keyDown') {
+      event.preventDefault()
+      mainWindow.webContents.toggleDevTools()
+    }
   })
 
   mainWindow.on('closed', () => {
@@ -280,32 +303,32 @@ function setupAutoUpdater() {
       releaseType: 'release'
     })
   } catch (err) {
-    console.error('[Updater] setFeedURL error:', err.message)
+    logToFile('ERROR', '[Updater] setFeedURL error:', err.message)
   }
 
   // Forward updater events to renderer
   autoUpdater.on('update-available', (info) => {
-    console.log('[Updater] Update available:', info.version)
+    logToFile('INFO', '[Updater] Update available:', info.version)
     mainWindow?.webContents.send('update-available', info)
   })
 
   autoUpdater.on('update-not-available', (info) => {
-    console.log('[Updater] Already up to date:', info.version)
+    logToFile('INFO', '[Updater] Already up to date:', info.version)
     mainWindow?.webContents.send('update-not-available', info)
   })
 
   autoUpdater.on('download-progress', (progress) => {
-    console.log(`[Updater] Download: ${progress.percent.toFixed(1)}%`)
+    logToFile('INFO', `[Updater] Download: ${progress.percent.toFixed(1)}%`)
     mainWindow?.webContents.send('download-progress', progress)
   })
 
   autoUpdater.on('update-downloaded', (info) => {
-    console.log('[Updater] Update downloaded:', info.version)
+    logToFile('INFO', '[Updater] Update downloaded:', info.version)
     mainWindow?.webContents.send('update-downloaded', info)
   })
 
   autoUpdater.on('error', (err) => {
-    console.error('[Updater] Error:', err.message)
+    logToFile('ERROR', '[Updater] Error:', err.message)
     mainWindow?.webContents.send('update-error', { message: err.message })
   })
 
@@ -314,7 +337,7 @@ function setupAutoUpdater() {
     if (!updateCheckInProgress) {
       updateCheckInProgress = true
       autoUpdater.checkForUpdates().catch((err) => {
-        console.log('[Updater] Startup check skipped:', err.message)
+        logToFile('WARN', '[Updater] Startup check skipped:', err.message)
         updateCheckInProgress = false
       })
     }
@@ -372,6 +395,14 @@ ipcMain.handle('app-versions', () => ({
 
 ipcMain.handle('get-app-path', () => app.getAppPath())
 
+// 前端日志写入主进程日志文件
+ipcMain.handle('log-to-file', (_event, level, message) => {
+  logToFile(level.toUpperCase(), '[Renderer]', message)
+})
+
+// 获取日志目录路径
+ipcMain.handle('get-log-dir', () => LOG_DIR)
+
 // ============================================================
 // Auto-updater IPC handlers
 // ============================================================
@@ -382,9 +413,18 @@ ipcMain.handle('check-for-update', async () => {
   }
   try {
     updateCheckInProgress = true
-    const result = await autoUpdater.checkForUpdates()
+    logToFile('INFO', '[Updater] Starting update check...')
+
+    // 带超时的更新检查（15秒）
+    const result = await Promise.race([
+      autoUpdater.checkForUpdates(),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('更新检查超时，请检查网络后重试')), 15000)
+      )
+    ])
+
     updateCheckInProgress = false
-    // result.updateInfo 包含 version, files, releaseNotes 等信息
+    logToFile('INFO', '[Updater] Check result:', JSON.stringify(result?.updateInfo?.version || 'none'))
     return {
       available: !!result?.updateInfo,
       version: result?.updateInfo?.version,
@@ -393,8 +433,8 @@ ipcMain.handle('check-for-update', async () => {
     }
   } catch (err) {
     updateCheckInProgress = false
-    console.error('[Updater] checkForUpdates error:', err.message)
-    return { available: false, error: err.message }
+    logToFile('ERROR', '[Updater] checkForUpdates error:', err.message)
+    return { available: false, error: err.message || '更新检查失败' }
   }
 })
 

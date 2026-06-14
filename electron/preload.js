@@ -80,4 +80,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.removeAllListeners('update-downloaded')
     ipcRenderer.removeAllListeners('update-error')
   },
+
+  // ============================================================
+  // 日志 API
+  // ============================================================
+
+  /** 写入前端日志到主进程文件 */
+  log: (level, message) => ipcRenderer.invoke('log-to-file', level, message),
+
+  /** 获取日志目录 */
+  getLogDir: () => ipcRenderer.invoke('get-log-dir'),
 })
