@@ -64,7 +64,6 @@ public class PromptTemplateInitializer implements CommandLineRunner {
             
         } catch (Exception e) {
             log.error("加载提示词模板失败", e);
-            throw e;
         }
     }
 }

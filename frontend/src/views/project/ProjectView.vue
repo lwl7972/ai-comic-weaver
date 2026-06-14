@@ -58,7 +58,7 @@
     </el-dialog>
 
     <!-- Create From Template Dialog -->
-    <el-dialog v-model="showTemplateDialog" title="{{ t('project.createFromTemplate') }}项目" width="720px" top="5vh">
+    <el-dialog v-model="showTemplateDialog" :title="t('project.createFromTemplate') + '项目'" width="720px" top="5vh">
       <!-- Step 1: Select Template -->
       <div v-if="templateStep === 1">
         <div v-if="templateStore.loading" style="text-align: center; padding: 40px 0;">
