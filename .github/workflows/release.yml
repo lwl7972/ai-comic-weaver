@@ -100,9 +100,7 @@ jobs:
         run: npm ci
 
       - name: Package Electron
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # GitHub Token 用于发布
-        run: npx electron-builder --win --publish always
+        run: npx electron-builder --win --publish never
 
       # ============================================================
       # 发布 GitHub Releases
