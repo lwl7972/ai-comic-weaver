@@ -20,33 +20,67 @@ jobs:
         uses: actions/checkout@v4
 
       # ============================================================
-      # 环境准备
+      # 环境准备 - Java
       # ============================================================
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
           cache: 'maven'
+          java-package: jdk
+          check-latest: true
+
+      # ============================================================
+      # 环境准备 - Node.js
+      # ============================================================
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          check-latest: true
+
+      # ============================================================
+      # 诊断信息
+      # ============================================================
+      - name: Verify Environment
+        run: |
+          Write-Host "=== Java 版本 ==="
+          java -version
+          Write-Host "=== Maven 版本 ==="
+          mvn --version
+          Write-Host "=== Node.js 版本 ==="
+          node --version
+          Write-Host "=== npm 版本 ==="
+          npm --version
+          Write-Host "=== 当前目录 ==="
+          Get-Location
+          Write-Host "=== 目录结构 ==="
+          Get-ChildItem | Select-Object Name
+        shell: pwsh
 
       # ============================================================
       # 构建后端
       # ============================================================
       - name: Build Backend
         run: |
+          Write-Host "=== 开始构建后端 ==="
           cd backend
-          mvn clean package -DskipTests -B
-          # 重命名为固定名称（Electron 期望此名称）
-          Copy-Item -Path "target\ai-comic-platform-0.1.0.jar" -Destination "target\ai-comic-platform.jar" -Force
+          Write-Host "=== 后端目录 ==="
+          Get-Location
+          Write-Host "=== pom.xml 内容（前 30 行）==="
+          Get-Content pom.xml -Head 30
           
-          # 验证构建产物
-          Write-Host "=== 构建产物列表 ==="
+          Write-Host "=== 执行 Maven 构建 ==="
+          mvn clean package -DskipTests -B -e -V
+          
+          Write-Host "=== 构建完成，检查 jar 文件 ==="
+          Get-ChildItem -Path target\*.jar | ForEach-Object { Write-Host $_.Name }
+          
+          # 重命名为固定名称（Electron 期望此名称）
+          Write-Host "=== 重命名 jar 文件 ==="
+          Copy-Item -Path "target\ai-comic-platform-0.1.0.jar" -Destination "target\ai-comic-platform.jar" -Force
           Get-ChildItem -Path target\*.jar
         shell: pwsh
 
