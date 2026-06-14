@@ -8,7 +8,7 @@ const { autoUpdater } = require('electron-updater')
 // ============================================================
 // 本地日志系统
 // ============================================================
-const LOG_DIR = path.join(app.getPath('userData'), 'logs')
+const LOG_DIR = path.join(app.isPackaged ? path.dirname(app.getPath('exe')) : __dirname, '..', 'logs')
 if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR, { recursive: true })
 
 function logToFile(level, ...args) {
