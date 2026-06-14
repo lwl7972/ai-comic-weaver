@@ -1,6 +1,7 @@
 package com.aicomic.integration;
 
-import com.aicomic.AiComicApplication;
+import com.aicomic.AiComicPlatformApplication;
+import com.aicomic.entity.Character;
 import com.aicomic.entity.*;
 import com.aicomic.repository.*;
 import org.junit.jupiter.api.*;
@@ -17,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * 端到端集成测试
  * 测试完整流水线：剧本 → 角色提取 → 场景提取 → 分镜解析 → 视频生成 → S 级合成
  */
-@SpringBootTest(classes = AiComicApplication.class)
+@SpringBootTest(classes = AiComicPlatformApplication.class)
 @ActiveProfiles("test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class PipelineIntegrationTest {
@@ -90,7 +91,7 @@ public class PipelineIntegrationTest {
         Character character = new Character();
         character.setProjectId(projectId);
         character.setName("测试主角");
-        character.setRole(Character.Role.PROTAGONIST);
+        character.setRole(Character.CharacterRole.PROTAGONIST);
         character.setGender(Character.Gender.MALE);
         character.setAgeRange("20-25 岁");
         character.setAppearance("英俊，黑发，剑眉");
@@ -107,7 +108,7 @@ public class PipelineIntegrationTest {
         Character character2 = new Character();
         character2.setProjectId(projectId);
         character2.setName("测试配角");
-        character2.setRole(Character.Role.SUPPORTING);
+        character2.setRole(Character.CharacterRole.SUPPORTING);
         character2.setGender(Character.Gender.FEMALE);
         characterRepository.save(character2);
 
@@ -123,7 +124,7 @@ public class PipelineIntegrationTest {
         scene.setName("测试场景 - 卧室");
         scene.setDescription("一个温馨的卧室");
         scene.setTimeOfDay(Scene.TimeOfDay.NIGHT);
-        scene.setWeather(Scene.Weather.CLEAR);
+        scene.setWeather(Scene.Weather.SUNNY);
         scene.setStyleHint("现代风格");
         scene = sceneRepository.save(scene);
 
@@ -189,15 +190,15 @@ public class PipelineIntegrationTest {
         assertEquals("集成测试项目", project.getName());
 
         // 验证剧集数量
-        List<Episode> episodes = episodeRepository.findByScriptId(scriptId);
+        List<Episode> episodes = episodeRepository.findByScriptIdOrderByEpisodeNumberAsc(scriptId);
         assertEquals(1, episodes.size());
 
         // 验证角色数量
-        List<Character> characters = characterRepository.findByProjectId(projectId);
+        List<Character> characters = characterRepository.findByProjectIdOrderByNameAsc(projectId);
         assertEquals(2, characters.size());
 
         // 验证场景数量
-        List<Scene> scenes = sceneRepository.findByProjectId(projectId);
+        List<Scene> scenes = sceneRepository.findByProjectIdOrderByNameAsc(projectId);
         assertEquals(1, scenes.size());
 
         // 验证分镜数量

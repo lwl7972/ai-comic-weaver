@@ -4,6 +4,7 @@ import com.aicomic.common.exception.ResourceNotFoundException;
 import com.aicomic.common.util.FFmpegUtils;
 import com.aicomic.dto.VideoGenerationRequest;
 import com.aicomic.entity.Episode;
+import com.aicomic.entity.PipelineState;
 import com.aicomic.entity.Project;
 import com.aicomic.entity.Storyboard;
 import com.aicomic.repository.EpisodeRepository;
@@ -19,6 +20,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -125,7 +127,7 @@ class DirectorServiceTest {
     }
 
     @Test
-    void testConcatVideoFragments_WithEmptyList() {
+    void testConcatVideoFragments_WithEmptyList() throws Exception {
         String result = directorService.concatVideoFragments(new ArrayList<>());
 
         assertNull(result);
@@ -253,7 +255,7 @@ class DirectorServiceTest {
         when(modelCallService.callVideo(anyString(), anyString(), isNull()))
                 .thenReturn("/videos/full_episode.mp4");
         when(pipelineStateService.markDirty(anyLong(), any(Project.PipelineStage.class)))
-                .thenReturn(true);
+                .thenReturn(new PipelineState());
 
     }
 

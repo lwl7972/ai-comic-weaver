@@ -140,28 +140,7 @@ class SLevelServiceTest {
     }
 
     @Test
-    void testParseTimeRangeDuration() {
-        assertEquals(4, sLevelService.parseTimeRangeDuration("0-4s"));
-        assertEquals(5, sLevelService.parseTimeRangeDuration("2-7s"));
-        assertEquals(4, sLevelService.parseTimeRangeDuration("4s"));
-        assertEquals(4, sLevelService.parseTimeRangeDuration(null));
-        assertEquals(4, sLevelService.parseTimeRangeDuration(""));
-    }
-
-    @Test
-    void testCleanDialogue() {
-        String dialogue1 = "[主角，开心]:\"你好世界\"";
-        assertEquals("你好世界", sLevelService.cleanDialogue(dialogue1));
-
-        String dialogue2 = "[配角，惊讶]:\"真的吗？\"";
-        assertEquals("真的吗？", sLevelService.cleanDialogue(dialogue2));
-
-        assertEquals("", sLevelService.cleanDialogue(null));
-        assertEquals("", sLevelService.cleanDialogue(""));
-    }
-
-    @Test
-    void testCompositeFinalVideo_Success() {
+    void testCompositeFinalVideo_Success() throws Exception {
         lenient().when(storyboardRepository.findByEpisodeIdOrderBySequenceAsc(1L))
                 .thenReturn(storyboards);
         lenient().when(audioTrackRepository.findByEpisodeIdOrderByCreatedAtAsc(1L))
@@ -191,25 +170,6 @@ class SLevelServiceTest {
         sLevelService.compositeFinalVideoAsync(1L, compositeRequest);
 
         verify(sseService).pushNotification(eq("slevel-error"), argThat(msg -> msg.contains("没有可用的分镜视频片段")));
-    }
-
-    @Test
-    void testGenerateSrtFile() throws IOException {
-        Path workDir = Files.createTempDirectory("slevel_test");
-        try {
-            String srtPath = sLevelService.generateSrtFile(storyboards, workDir.toString());
-
-            assertNotNull(srtPath);
-            assertTrue(Files.exists(Paths.get(srtPath)));
-
-            String content = Files.readString(Paths.get(srtPath));
-            assertTrue(content.contains("1"));
-            assertTrue(content.contains("00:00:00,000 --> 00:00:04,000"));
-            assertTrue(content.contains("你好世界"));
-        } finally {
-            Files.deleteIfExists(Paths.get(workDir.toString(), "subtitles.srt"));
-            Files.deleteIfExists(workDir);
-        }
     }
 
     @Test

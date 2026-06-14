@@ -24,10 +24,14 @@ class FFmpegUtilsTest {
     Path tempDir;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
         ffmpegUtils = new FFmpegUtils();
-        ffmpegUtils.ffmpegPath = "ffmpeg";
-        ffmpegUtils.timeoutSeconds = 10;
+        java.lang.reflect.Field pathField = FFmpegUtils.class.getDeclaredField("ffmpegPath");
+        pathField.setAccessible(true);
+        pathField.set(ffmpegUtils, "ffmpeg");
+        java.lang.reflect.Field timeoutField = FFmpegUtils.class.getDeclaredField("timeoutSeconds");
+        timeoutField.setAccessible(true);
+        timeoutField.setInt(ffmpegUtils, 10);
     }
 
     @Test
