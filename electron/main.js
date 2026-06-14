@@ -130,15 +130,6 @@ function createApplicationMenu() {
   Menu.setApplicationMenu(menu)
 }
 
-  mainWindow.on('ready-to-show', () => {
-    mainWindow.show()
-  })
-
-  mainWindow.on('closed', () => {
-    mainWindow = null
-  })
-}
-
 // ============================================================
 // JVM 后端启动 (ADR-18: spawn 子进程 + 随机端口)
 // ============================================================
