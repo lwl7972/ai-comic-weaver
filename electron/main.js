@@ -160,16 +160,23 @@ function createApplicationMenu() {
 function startBackend() {
   const jarPath = path.join(
     process.resourcesPath || __dirname,
-    app.isPackaged ? 'backend/target/ai-comic-platform-0.1.0.jar' : '../backend/target/ai-comic-platform-0.1.0.jar'
+    app.isPackaged ? 'backend/ai-comic-platform.jar' : '../backend/target/ai-comic-platform-0.1.0.jar'
   )
+
+  // 数据目录：打包后放在用户目录下，开发模式用项目根目录
+  const dataDir = app.isPackaged
+    ? path.join(app.getPath('home'), '.ai-comic', 'data')
+    : path.join(__dirname, '..', 'data')
 
   const args = [
     '-jar', jarPath,
     `--server.port=${backendPort}`,
+    `--data-dir=${dataDir}`,
   ]
 
   console.log(`[Electron] Starting JVM backend on port ${backendPort}...`)
   console.log(`[Electron] JAR path: ${jarPath}`)
+  console.log(`[Electron] Data dir: ${dataDir}`)
 
   jvmProcess = spawn('java', args, {
     stdio: ['ignore', 'pipe', 'pipe'],

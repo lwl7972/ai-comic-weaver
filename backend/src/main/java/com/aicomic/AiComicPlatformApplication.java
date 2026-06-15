@@ -4,18 +4,30 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 
-/**
- * AI漫剧制作平台 - 后端主入口
- *
- * 启动方式：
- * 1. IDE 直接运行本类的 main 方法（开发模式，端口 8080）
- * 2. Electron spawn 子进程模式：java -jar --server.port={随机端口}
- */
+import java.io.File;
+
 @SpringBootApplication
 @EnableConfigurationProperties
 public class AiComicPlatformApplication {
 
     public static void main(String[] args) {
+        // 在 Spring 启动前解析 --data-dir 参数并创建目录
+        String dataDir = resolveDataDir(args);
+        File dir = new File(dataDir);
+        if (!dir.exists()) {
+            dir.mkdirs();
+        }
+        System.setProperty("app.data.dir", dir.getAbsolutePath());
+
         SpringApplication.run(AiComicPlatformApplication.class, args);
+    }
+
+    private static String resolveDataDir(String[] args) {
+        for (String arg : args) {
+            if (arg.startsWith("--data-dir=")) {
+                return arg.substring("--data-dir=".length());
+            }
+        }
+        return "./data";
     }
 }

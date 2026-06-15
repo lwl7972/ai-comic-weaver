@@ -6,7 +6,7 @@ spring:
     name: ai-comic-platform
 
   datasource:
-    url: jdbc:sqlite:data/aicomic.db
+    url: jdbc:sqlite:${app.data.dir:./data}/aicomic.db
     driver-class-name: org.sqlite.JDBC
 
   jpa:

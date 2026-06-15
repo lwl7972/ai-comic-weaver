@@ -13,7 +13,10 @@ import java.time.LocalDateTime;
  * 5.5 剧集表
  */
 @Entity
-@Table(name = "episode", indexes = {@Index(name = "idx_episode_script_id", columnList = "script_id")})
+@Table(name = "episode", indexes = {
+    @Index(name = "idx_episode_script_id", columnList = "script_id"),
+    @Index(name = "idx_episode_project_id", columnList = "project_id")
+})
 @Getter
 @Setter
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
@@ -23,6 +26,9 @@ public class Episode {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @EqualsAndHashCode.Include
     private Long id;
+
+    @Column(name = "project_id", nullable = false)
+    private Long projectId;
 
     @Column(name = "script_id", nullable = false)
     private Long scriptId;
