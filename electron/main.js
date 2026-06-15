@@ -160,7 +160,7 @@ function createApplicationMenu() {
 function startBackend() {
   const jarPath = path.join(
     process.resourcesPath || __dirname,
-    app.isPackaged ? 'backend/ai-comic-platform.jar' : '../backend/target/ai-comic-platform-0.1.0.jar'
+    app.isPackaged ? 'backend/target/ai-comic-platform-0.1.0.jar' : '../backend/target/ai-comic-platform-0.1.0.jar'
   )
 
   const args = [
