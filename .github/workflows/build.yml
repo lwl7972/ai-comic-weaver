@@ -32,8 +32,10 @@ jobs:
       - name: Prepare backend jar
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path backend\target | Out-Null
-          Copy-Item -Path backend\target\ai-comic-platform-0.1.0.jar -Destination backend\target\ai-comic-platform.jar -Force
+          $jar = Get-ChildItem -Path backend\target\ai-comic-platform-*.jar | Select-Object -First 1
+          if (-not $jar) { throw "No backend jar found" }
+          Write-Host "Found jar: $($jar.Name)"
+          Copy-Item -Path $jar.FullName -Destination backend\target\ai-comic-platform.jar -Force
 
       # ============================================================
       # Frontend: Node.js + Vite

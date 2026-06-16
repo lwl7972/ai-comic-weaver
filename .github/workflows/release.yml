@@ -80,7 +80,10 @@ jobs:
           
           # 重命名为固定名称（Electron 期望此名称）
           Write-Host "=== 重命名 jar 文件 ==="
-          Copy-Item -Path "target\ai-comic-platform-0.1.0.jar" -Destination "target\ai-comic-platform.jar" -Force
+          $jar = Get-ChildItem -Path target\ai-comic-platform-*.jar | Select-Object -First 1
+          if (-not $jar) { throw "No backend jar found" }
+          Write-Host "Found jar: $($jar.Name)"
+          Copy-Item -Path $jar.FullName -Destination "target\ai-comic-platform.jar" -Force
           Get-ChildItem -Path target\*.jar
         shell: pwsh
 
