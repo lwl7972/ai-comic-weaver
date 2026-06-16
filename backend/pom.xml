@@ -14,7 +14,7 @@
 
     <groupId>com.aicomic</groupId>
     <artifactId>ai-comic-platform</artifactId>
-    <version>0.1.0</version>
+    <version>0.9.3</version>
     <name>AI Comic Platform Backend</name>
     <description>AI 漫剧制作平台 - Spring Boot 后端服务</description>
 

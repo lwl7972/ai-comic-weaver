@@ -112,7 +112,7 @@ function createApplicationMenu() {
             type: 'info',
             title: '关于 AI 漫剧',
             message: 'AI 漫剧制作平台',
-            detail: '版本：0.1.0\n\n基于 AI 的漫剧创作桌面应用\n支持剧本→角色→场景→分镜→导演→成片完整流水线',
+            detail: `版本：${app.getVersion()}\n\n基于 AI 的漫剧创作桌面应用\n支持剧本→角色→场景→分镜→导演→成片完整流水线`,
             buttons: ['确定'],
           })
         },
@@ -157,10 +157,16 @@ function createApplicationMenu() {
 // JVM 后端启动 (ADR-18: spawn 子进程 + 随机端口)
 // ============================================================
 
+function getDevJarPath() {
+  const targetDir = path.join(__dirname, '..', 'backend', 'target')
+  const jars = fs.readdirSync(targetDir).filter(f => f.startsWith('ai-comic-platform-') && f.endsWith('.jar'))
+  return jars.length > 0 ? path.join('..', 'backend', 'target', jars[0]) : '../backend/target/ai-comic-platform.jar'
+}
+
 function startBackend() {
   const jarPath = path.join(
     process.resourcesPath || __dirname,
-    app.isPackaged ? 'backend/ai-comic-platform.jar' : '../backend/target/ai-comic-platform-0.1.0.jar'
+    app.isPackaged ? 'backend/ai-comic-platform.jar' : getDevJarPath()
   )
 
   // 数据目录：打包后放在用户目录下，开发模式用项目根目录
