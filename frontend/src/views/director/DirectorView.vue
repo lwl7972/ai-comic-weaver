@@ -311,7 +311,7 @@ function stopStatusPolling() {
 
 function scheduleNextPoll() {
   // 有生成中的任务时用短间隔，否则用长间隔节省资源
-  const hasActiveGeneration = directorStore.videoStatus?.videoGenerating > 0
+  const hasActiveGeneration = (directorStore.videoStatus?.videoGenerating ?? 0) > 0
   const interval = hasActiveGeneration ? POLL_INTERVAL_ACTIVE : POLL_INTERVAL_IDLE
   statusTimer = setTimeout(async () => {
     await directorStore.fetchVideoStatus(episodeId.value)
