@@ -590,7 +590,8 @@ public class StoryboardService {
         } catch (Exception e) {
             log.warn("模板渲染失败，使用硬编码提示词：{}", e.getMessage());
         }
-        return buildStoryboardParsePromptWithTemplate(episode);
+        // 回退到硬编码提示词（注意：不能调用自身，否则无限递归）
+        return buildStoryboardParsePrompt(episode);
     }
 
     /**
@@ -623,6 +624,7 @@ public class StoryboardService {
         } catch (Exception e) {
             log.warn("模板渲染失败，使用硬编码提示词：{}", e.getMessage());
         }
-        return buildStoryboardImagePromptWithTemplate(sb, projectId);
+        // 回退到硬编码提示词（注意：不能调用自身，否则无限递归）
+        return buildStoryboardImagePrompt(sb, projectId);
     }
 }

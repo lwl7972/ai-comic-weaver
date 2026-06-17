@@ -28,8 +28,20 @@ const http: AxiosInstance = axios.create({
 // Cached backend port for Electron mode
 let cachedBackendPort: string | null = null
 
+// In Electron mode, wait for backend-ready signal before making requests
+let backendReadyPromise: Promise<void> | null = null
+if ((window as any).electronAPI?.onBackendReady) {
+  backendReadyPromise = new Promise<void>((resolve) => {
+    (window as any).electronAPI.onBackendReady(() => resolve())
+  })
+}
+
 // Request interceptor: attach backend port in Electron mode
 http.interceptors.request.use(async (config) => {
+  // Wait for backend to be ready in Electron mode
+  if (backendReadyPromise) {
+    await backendReadyPromise
+  }
   // In Electron, redirect API calls to the dynamic JVM port
   if ((window as any).electronAPI?.getBackendPort) {
     if (!cachedBackendPort) {

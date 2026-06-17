@@ -125,7 +125,7 @@
                 </el-tag>
               </span>
               <span v-if="sb.involvedCharacters">
-                <el-icon><User /></el-icon> {{ parseCharacterNames(sb.involvedCharacters).join(', ') }}
+                <el-icon><User /></el-icon> {{ parseStringArray(sb.involvedCharacters).join(', ') }}
                 <el-tag v-if="sb.involvedCharacterIds" size="small" type="primary" class="ref-badge">
                   <el-icon><Link /></el-icon> 已关联
                 </el-tag>
@@ -139,7 +139,7 @@
             <div v-if="sb.referenceImageUrls" class="sb-refs">
               <span class="refs-label">参考图：</span>
               <div class="refs-images">
-                <img v-for="(url, idx) in parseRefUrls(sb.referenceImageUrls)" :key="idx" 
+                <img v-for="(url, idx) in parseStringArray(sb.referenceImageUrls)" :key="idx" 
                      :src="url" class="ref-thumb" alt="参考图" />
               </div>
             </div>
@@ -312,7 +312,11 @@ import { useProjectStore } from '@/stores/project'
 import { useStoryboardStore } from '@/stores/storyboard'
 import { useCharacterStore } from '@/stores/character'
 import { useSceneStore } from '@/stores/scene'
-import type { Storyboard, ShotSize, CameraAngle, CameraMovement, StoryboardStatus, Character, Scene } from '@/types'
+import type { Storyboard } from '@/types'
+import {
+  getShotSizeLabel, getCameraAngleLabel, getCameraMovementLabel,
+  parseStringArray, parseNumberArray,
+} from '@/utils/labels'
 
 const projectStore = useProjectStore()
 const store = useStoryboardStore()
@@ -326,32 +330,6 @@ const editForm = ref<Partial<Storyboard> | null>(null)
 // 角色和场景选择器
 const selectedCharacterIds = ref<number[]>([])
 const selectedSceneId = ref<number | null>(null)
-
-// 解析 involvedCharacters/involvedCharacterIds 为 name/ID 数组
-function parseCharacterNames(jsonStr: string | undefined): string[] {
-  if (!jsonStr) return []
-  try { return JSON.parse(jsonStr) } catch { return [] }
-}
-
-function parseCharacterIds(jsonStr: string | undefined): number[] {
-  if (!jsonStr) return []
-  try { return JSON.parse(jsonStr) } catch { return [] }
-}
-
-// 获取角色定妆图URL（通过 referenceImageId → AssetItem 的路径暂时简化）
-function getCharacterThumbnail(ch: Character): string | undefined {
-  // 暂时没有直接的定妆图URL字段，后续集成 AssetItem 后可完善
-  return undefined
-}
-
-function getSceneThumbnail(scene: Scene): string | undefined {
-  return scene.frontViewUrl
-}
-
-function parseRefUrls(jsonStr: string | undefined): string[] {
-  if (!jsonStr) return []
-  try { return JSON.parse(jsonStr) } catch { return [] }
-}
 
 const currentStep = computed(() => {
   const sbs = store.storyboards
@@ -400,7 +378,7 @@ function handleEditStoryboard(sb: Storyboard, index: number) {
   editingIndex.value = index
   editForm.value = { ...sb }
   // 初始化角色/场景选择器
-  selectedCharacterIds.value = parseCharacterIds(sb.involvedCharacterIds)
+  selectedCharacterIds.value = parseNumberArray(sb.involvedCharacterIds)
   selectedSceneId.value = sb.involvedSceneId ?? null
   showEditDialog.value = true
 }
@@ -409,7 +387,7 @@ async function handleSaveEdit() {
   if (!editForm.value?.id) return
   try {
     // 检测角色/场景 ID 是否发生变化，决定是否需要重新解析引用
-    const originalCharIds = parseCharacterIds(editForm.value.involvedCharacterIds)
+    const originalCharIds = parseNumberArray(editForm.value.involvedCharacterIds)
     const originalSceneId = editForm.value.involvedSceneId ?? null
     const charIdsChanged = JSON.stringify(selectedCharacterIds.value) !== JSON.stringify(originalCharIds)
     const sceneIdChanged = selectedSceneId.value !== originalSceneId
@@ -473,31 +451,6 @@ function statusLabel(status: string) {
     ERROR: '生成失败',
   }
   return map[status] || status
-}
-
-function getShotSizeLabel(ss: string) {
-  const map: Record<string, string> = {
-    EXTREME_CLOSE_UP: '特写', CLOSE_UP: '近景', MEDIUM_CLOSE_UP: '中近景',
-    MEDIUM: '中景', MEDIUM_WIDE: '中远景', WIDE: '远景', EXTREME_WIDE: '大远景',
-  }
-  return map[ss] || ss
-}
-
-function getCameraAngleLabel(ca: string) {
-  const map: Record<string, string> = {
-    EYE_LEVEL: '平视', HIGH_ANGLE: '俯视', LOW_ANGLE: '仰视',
-    BIRD_EYE: '鸟瞰', DUTCH_ANGLE: '倾斜',
-  }
-  return map[ca] || ca
-}
-
-function getCameraMovementLabel(cm: string) {
-  const map: Record<string, string> = {
-    STATIC: '静止', PAN_LEFT: '左摇', PAN_RIGHT: '右摇',
-    TILT_UP: '上摇', TILT_DOWN: '下摇', ZOOM_IN: '推近',
-    ZOOM_OUT: '拉远', TRACKING: '跟踪', CRANE: '升降', HANDHELD: '手持',
-  }
-  return map[cm] || cm
 }
 </script>
 

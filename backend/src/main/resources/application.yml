@@ -1,28 +1,70 @@
 server:
   port: 8080
+  # 缩短 shutdown 等待时间，Electron 环境快速退出
+  shutdown: graceful
+  # 减少连接等待队列，不适合 Electron 内嵌模式
+  tomcat:
+    accept-count: 10
+    threads:
+      min-spare: 4
+      max: 20
+    connection-timeout: 5000
+    # 禁用 Tomcat 的 MBean 注册（减少类加载）
+    mbeanregistry:
+      enabled: false
 
 spring:
   application:
     name: ai-comic-platform
+  main:
+    lazy-initialization: true
+    # 禁止循环引用（Spring Boot 2.6+ 默认），确保组件依赖清晰
+    allow-circular-references: false
 
+  # === 排除不必要的自动配置以加速启动 ===
+  # 注：不需要的自动配置请在主类 @SpringBootApplication(exclude={...}) 中排除
+
+  # === SQLite 数据源（连接池由 SQLiteConfig.java 管理） ===
   datasource:
     url: jdbc:sqlite:${app.data.dir:./data}/aicomic.db
     driver-class-name: org.sqlite.JDBC
+    # HikariCP 连接池设置（由 SQLiteConfig 读取）
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      idle-timeout: 300000
+      max-lifetime: 600000
+      connection-timeout: 10000
 
+  # === JPA/Hibernate（SQLite 方言 + 性能调优） ===
   jpa:
     database-platform: com.aicomic.common.config.SQLiteDialect
+    # 首次启动用 update 创建表，后续运行时改为 validate 加速启动
+    # 当需要修改 schema 时临时改回 update
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     show-sql: false
+    open-in-view: false    # 禁用 OSIV，避免长连接占用
     properties:
       hibernate:
-        format_sql: true
+        format_sql: false
+        # 批量操作优化
+        jdbc:
+          batch_size: 20
+          fetch_size: 50
+        # 禁用统计信息收集（减少内存开销）
+        generate_statistics: false
+        # 使用 Hibernate 6 的字节码增强延迟加载
+        bytecode:
+          use_reflection_optimizer: true
 
+  # === 文件上传 ===
   servlet:
     multipart:
       max-file-size: 100MB
       max-request-size: 100MB
 
+  # === 异步任务线程池 ===
   task:
     execution:
       pool:
@@ -44,28 +86,27 @@ app:
   # Random port for Electron spawn mode (overridden at runtime by main process)
   random-port: ${RANDOM_PORT:8080}
 
-# CORS configuration - 生产环境请替换为具体域名
-# 当前允许所有来源，适合本地开发；部署时建议改为:
-#   allowed-origins: https://your-domain.com
+# CORS configuration
 cors:
   allowed-origins: "*"
 
+# === 日志：生产环境减少输出 ===
 logging:
   level:
-    com.aicomic: DEBUG
+    com.aicomic: INFO
     org.hibernate.SQL: WARN
+    org.hibernate.orm.jdbc.bind: WARN
+    org.hibernate.engine.internal: WARN
+    org.springframework.boot.SpringApplication: INFO
+    # 减少 Spring 框架的 verbose 日志
+    org.springframework: WARN
+    com.zaxxer.hikari: WARN
   file:
     name: logs/aicomic.log
 
-# SpringDoc OpenAPI Configuration
+# SpringDoc OpenAPI Configuration (disabled for faster startup)
 springdoc:
-  swagger-ui:
-    path: /swagger-ui.html
-    tags-sorter: alpha
-    operations-sorter: alpha
   api-docs:
-    path: /v3/api-docs
-    enabled: true
-  show-actuator: false
-  default-consumes-media-type: application/json
-  default-produces-media-type: application/json
+    enabled: false
+  swagger-ui:
+    enabled: false

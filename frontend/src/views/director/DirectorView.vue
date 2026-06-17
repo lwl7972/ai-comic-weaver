@@ -63,80 +63,6 @@
       </div>
     </el-card>
 
-    <!-- Loading / Empty -->
-    <div v-if="storyboardStore.loading" class="loading-center">
-      <el-icon class="is-loading"><Loading /></el-icon>
-    </div>
-    <div v-else-if="directorStore.storyboards.length === 0" class="empty-hint">
-      <el-empty description="暂无分镜数据，请先在分镜模块中生成分镜图片" :image-size="80" />
-    </div>
-
-    <!-- Storyboard Video List -->
-    <div v-else class="shot-list">
-      <el-card
-        v-for="sb in directorStore.storyboards"
-        :key="sb.id"
-        :class="['shot-card', videoStatusClass(sb)]"
-        shadow="hover"
-      >
-        <div class="shot-header">
-          <span class="shot-label">镜头 #{{ sb.sequence + 1 }}</span>
-          <el-tag size="small" :type="videoTagType(sb.status)">
-            {{ videoStatusLabel(sb.status) }}
-          </el-tag>
-        </div>
-
-        <div class="shot-content">
-          <!-- Reference image -->
-          <div class="shot-image" v-if="sb.generatedImageUrl">
-            <img :src="sb.generatedImageUrl" alt="分镜参考图" />
-          </div>
-          <div class="shot-image-placeholder" v-else>
-            <el-icon :size="28"><Picture /></el-icon>
-            <span>暂无参考图</span>
-          </div>
-
-          <!-- Shot info -->
-          <div class="shot-info">
-            <div v-if="sb.action" class="shot-action">{{ sb.action }}</div>
-            <div class="shot-params">
-              <el-tag size="small">{{ getShotSizeLabel(sb.shotSize) }}</el-tag>
-              <el-tag size="small" type="success">{{ getCameraAngleLabel(sb.cameraAngle) }}</el-tag>
-              <el-tag size="small" type="warning">{{ getCameraMovementLabel(sb.cameraMovement) }}</el-tag>
-              <!-- 角色/场景引用标识 -->
-              <el-tag v-if="sb.involvedCharacterIds" size="small" type="primary">
-                角色({{ parseCharacterIds(sb.involvedCharacterIds).length }}人)
-              </el-tag>
-              <el-tag v-if="sb.involvedSceneId" size="small" type="success">
-                场景已关联
-              </el-tag>
-            </div>
-            <!-- 参考图缩略图 -->
-            <div v-if="sb.involvedSceneId && getSceneUrl(sb)" class="shot-ref-images">
-              <img :src="getSceneUrl(sb)" class="shot-ref-thumb" title="场景参考图" />
-            </div>
-          </div>
-        </div>
-
-        <!-- Video result / action -->
-        <div class="shot-footer">
-          <div v-if="sb.generatedVideoUrl" class="video-link">
-            <el-icon><VideoPlay /></el-icon>
-            <span>{{ sb.generatedVideoUrl }}</span>
-          </div>
-          <el-button
-            v-else
-            size="small"
-            type="primary"
-            :loading="directorStore.generating"
-            :disabled="!sb.generatedImageUrl"
-            @click="handleGenerateShotVideo(sb.id!)"
-          >
-            生成视频
-          </el-button>
-        </div>
-    </el-card>
-
     <!-- Queue Stats Card -->
     <el-card v-if="directorStore.queueStats" class="queue-stats-card">
       <template #header>
@@ -161,6 +87,82 @@
       </div>
     </el-card>
 
+    <!-- Loading / Empty -->
+    <div v-if="storyboardStore.loading" class="loading-center">
+      <el-icon class="is-loading"><Loading /></el-icon>
+    </div>
+    <div v-else-if="directorStore.storyboards.length === 0" class="empty-hint">
+      <el-empty description="暂无分镜数据，请先在分镜模块中生成分镜图片" :image-size="80" />
+    </div>
+
+    <!-- Storyboard Video List -->
+    <div v-else class="shot-list">
+      <el-card
+        v-for="sb in directorStore.storyboards"
+        :key="sb.id"
+        :class="['shot-card', videoStatusClass(sb)]"
+        shadow="hover"
+      >
+        <div class="shot-header">
+          <span class="shot-label">镜头 #{{ sb.sequence + 1 }}</span>
+          <el-tag size="small" :type="getStoryboardStatusTagType(sb.status)">
+            {{ getStoryboardStatusLabel(sb.status) }}
+          </el-tag>
+        </div>
+
+        <div class="shot-content">
+          <!-- Reference image -->
+          <div class="shot-image" v-if="sb.generatedImageUrl" @click="previewImage(sb.generatedImageUrl)">
+            <img :src="sb.generatedImageUrl" alt="分镜参考图" />
+          </div>
+          <div class="shot-image-placeholder" v-else>
+            <el-icon :size="28"><Picture /></el-icon>
+            <span>暂无参考图</span>
+          </div>
+
+          <!-- Shot info -->
+          <div class="shot-info">
+            <div v-if="sb.action" class="shot-action">{{ sb.action }}</div>
+            <div class="shot-params">
+              <el-tag size="small">{{ getShotSizeLabel(sb.shotSize) }}</el-tag>
+              <el-tag size="small" type="success">{{ getCameraAngleLabel(sb.cameraAngle) }}</el-tag>
+              <el-tag size="small" type="warning">{{ getCameraMovementLabel(sb.cameraMovement) }}</el-tag>
+              <!-- 角色/场景引用标识 -->
+              <el-tag v-if="sb.involvedCharacterIds" size="small" type="primary">
+                角色({{ parseNumberArray(sb.involvedCharacterIds).length }}人)
+              </el-tag>
+              <el-tag v-if="sb.involvedSceneId" size="small" type="success">
+                场景已关联
+              </el-tag>
+            </div>
+            <!-- 参考图缩略图 -->
+            <div v-if="sb.involvedSceneId && getSceneUrl(sb)" class="shot-ref-images">
+              <img :src="getSceneUrl(sb)" class="shot-ref-thumb" title="场景参考图" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Video result / action -->
+        <div class="shot-footer">
+          <template v-if="sb.generatedVideoUrl">
+            <el-button size="small" type="success" text @click="previewVideo(sb.generatedVideoUrl)">
+              <el-icon><VideoPlay /></el-icon> 预览视频
+            </el-button>
+          </template>
+          <el-button
+            v-else
+            size="small"
+            type="primary"
+            :loading="directorStore.generating"
+            :disabled="!sb.generatedImageUrl"
+            @click="handleGenerateShotVideo(sb.id!)"
+          >
+            生成视频
+          </el-button>
+        </div>
+      </el-card>
+    </div>
+
     <!-- Task List Card -->
     <el-card v-if="directorStore.tasks.length > 0" class="task-list-card">
       <template #header>
@@ -177,8 +179,8 @@
         </el-table-column>
         <el-table-column prop="status" label="状态" width="100">
           <template #default="{ row }">
-            <el-tag :type="getStatusTagType(row.status)">
-              {{ getStatusLabel(row.status) }}
+            <el-tag :type="getTaskStatusTagType(row.status)">
+              {{ getTaskStatusLabel(row.status) }}
             </el-tag>
           </template>
         </el-table-column>
@@ -209,28 +211,64 @@
         </el-table-column>
       </el-table>
     </el-card>
-    </div>
+
+    <!-- Image Preview Dialog -->
+    <el-dialog v-model="showImagePreview" title="分镜参考图" width="640px" append-to-body>
+      <div class="image-preview-container">
+        <img v-if="previewImageUrl" :src="previewImageUrl" alt="预览" class="preview-img" />
+      </div>
+    </el-dialog>
+
+    <!-- Video Preview Dialog -->
+    <el-dialog v-model="showVideoPreview" title="视频预览" width="720px" append-to-body>
+      <div class="video-preview-container">
+        <video v-if="previewVideoUrl" :src="previewVideoUrl" controls autoplay class="preview-video" />
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 const { t } = useI18n()
-import { onMounted, computed, onUnmounted } from 'vue'
+import { onMounted, computed, onUnmounted, ref } from 'vue'
 import {
   VideoCamera, Connection, Loading, Picture, VideoPlay, ArrowDown, VideoPause, DataAnalysis,
 } from '@element-plus/icons-vue'
+import { ElMessageBox } from 'element-plus'
 import { useProjectStore } from '@/stores/project'
 import { useDirectorStore } from '@/stores/director'
 import { useStoryboardStore } from '@/stores/storyboard'
 import { useSceneStore } from '@/stores/scene'
 import { useNotificationStore } from '@/stores/notification'
 import type { Storyboard } from '@/types'
+import {
+  getStoryboardStatusLabel, getStoryboardStatusTagType,
+  getShotSizeLabel, getCameraAngleLabel, getCameraMovementLabel,
+  getTaskStatusLabel, getTaskStatusTagType, getPriorityTagType,
+  parseNumberArray,
+} from '@/utils/labels'
 
 const projectStore = useProjectStore()
 const directorStore = useDirectorStore()
 const storyboardStore = useStoryboardStore()
 const sceneStore = useSceneStore()
+
+// 预览状态
+const showImagePreview = ref(false)
+const previewImageUrl = ref('')
+const showVideoPreview = ref(false)
+const previewVideoUrl = ref('')
+
+function previewImage(url: string) {
+  previewImageUrl.value = url
+  showImagePreview.value = true
+}
+
+function previewVideo(url: string) {
+  previewVideoUrl.value = url
+  showVideoPreview.value = true
+}
 
 function getSceneUrl(sb: Storyboard): string | undefined {
   if (!sb.involvedSceneId) return undefined
@@ -242,7 +280,10 @@ function getSceneUrl(sb: Storyboard): string | undefined {
 const episodeId = computed(() => projectStore.currentProject?.currentEpisodeId || 1)
 const projectId = computed(() => projectStore.currentProject?.id)
 
+// 智能轮询：生成中 2s 间隔，空闲 10s 间隔
 let statusTimer: ReturnType<typeof setInterval> | null = null
+const POLL_INTERVAL_ACTIVE = 2000
+const POLL_INTERVAL_IDLE = 10000
 
 onMounted(async () => {
   await directorStore.fetchStoryboards(episodeId.value)
@@ -253,11 +294,29 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  if (statusTimer) clearInterval(statusTimer)
+  stopStatusPolling()
 })
 
 function startStatusPolling() {
-  statusTimer = setInterval(() => directorStore.fetchVideoStatus(episodeId.value), 3000)
+  stopStatusPolling()
+  scheduleNextPoll()
+}
+
+function stopStatusPolling() {
+  if (statusTimer) {
+    clearTimeout(statusTimer)
+    statusTimer = null
+  }
+}
+
+function scheduleNextPoll() {
+  // 有生成中的任务时用短间隔，否则用长间隔节省资源
+  const hasActiveGeneration = directorStore.videoStatus?.videoGenerating > 0
+  const interval = hasActiveGeneration ? POLL_INTERVAL_ACTIVE : POLL_INTERVAL_IDLE
+  statusTimer = setTimeout(async () => {
+    await directorStore.fetchVideoStatus(episodeId.value)
+    scheduleNextPoll()
+  }, interval)
 }
 
 async function handleGenerateFullVideo() {
@@ -281,8 +340,13 @@ async function handleResumeQueue() {
 }
 
 async function handleCancelTask(taskId: string) {
-  if (confirm('确定要取消此任务吗？')) {
+  try {
+    await ElMessageBox.confirm('确定要取消此任务吗？', '确认取消', { type: 'warning' })
     await directorStore.cancelTask(taskId)
+  } catch (err: any) {
+    if (err !== 'cancel' && err?.message !== 'cancel') {
+      console.error('[DirectorView] 取消任务失败:', err?.message)
+    }
   }
 }
 
@@ -292,102 +356,12 @@ async function handleViewQueueStats() {
   useNotificationStore().info('队列统计已刷新')
 }
 
-function getStatusTagType(status: string) {
-  const map: Record<string, string> = {
-    PENDING: 'info',
-    RUNNING: 'warning',
-    SUCCESS: 'success',
-    FAILED: 'danger',
-    CANCELLED: 'info',
-  }
-  return map[status] || 'info'
-}
-
-function getStatusLabel(status: string) {
-  const map: Record<string, string> = {
-    PENDING: '等待中',
-    RUNNING: '执行中',
-    SUCCESS: '完成',
-    FAILED: '失败',
-    CANCELLED: '已取消',
-  }
-  return map[status] || status
-}
-
-function getPriorityTagType(priority: string) {
-  const map: Record<string, string> = {
-    HIGH: 'danger',
-    MEDIUM: 'warning',
-    LOW: 'info',
-  }
-  return map[priority] || 'info'
-}
-
 function videoStatusClass(sb: Storyboard) {
   if (!sb) return ''
   if (sb.generatedVideoUrl) return 'status-done'
   if (sb.status === 'VIDEO_GENERATING') return 'status-generating'
   if (sb.status === 'ERROR') return 'status-error'
   return ''
-}
-
-function videoTagType(status: string | undefined) {
-  if (!status) return 'info'
-  const map: Record<string, string> = {
-    VIDEO_DONE: 'success',
-    VIDEO_GENERATING: 'warning',
-    IMAGE_DONE: 'info',
-    IMAGE_GENERATING: 'warning',
-    PENDING: 'info',
-    ERROR: 'danger',
-  }
-  return map[status] || 'info'
-}
-
-function videoStatusLabel(status: string | undefined) {
-  if (!status) return '未知'
-  const map: Record<string, string> = {
-    PENDING: '待生成',
-    IMAGE_GENERATING: '图片生成中',
-    IMAGE_DONE: '图片已生成',
-    VIDEO_GENERATING: '视频生成中',
-    VIDEO_DONE: '视频已生成',
-    ERROR: '失败',
-  }
-  return map[status] || status
-}
-
-function getShotSizeLabel(ss: string | undefined) {
-  if (!ss) return '未知'
-  const map: Record<string, string> = {
-    EXTREME_CLOSE_UP: '特写', CLOSE_UP: '近景', MEDIUM_CLOSE_UP: '中近景',
-    MEDIUM: '中景', MEDIUM_WIDE: '中远景', WIDE: '远景', EXTREME_WIDE: '大远景',
-  }
-  return map[ss] || ss
-}
-
-function getCameraAngleLabel(ca: string | undefined) {
-  if (!ca) return '未知'
-  const map: Record<string, string> = {
-    EYE_LEVEL: '平视', HIGH_ANGLE: '俯视', LOW_ANGLE: '仰视',
-    BIRD_EYE: '鸟瞰', DUTCH_ANGLE: '倾斜',
-  }
-  return map[ca] || ca
-}
-
-function getCameraMovementLabel(cm: string | undefined) {
-  if (!cm) return '未知'
-  const map: Record<string, string> = {
-    STATIC: '静止', PAN_LEFT: '左摇', PAN_RIGHT: '右摇',
-    TILT_UP: '上摇', TILT_DOWN: '下摇', ZOOM_IN: '推近',
-    ZOOM_OUT: '拉远', TRACKING: '跟踪', CRANE: '升降', HANDHELD: '手持',
-  }
-  return map[cm] || cm
-}
-
-function parseCharacterIds(jsonStr: string | undefined): number[] {
-  if (!jsonStr) return []
-  try { return JSON.parse(jsonStr) } catch { return [] }
 }
 </script>
 
@@ -486,6 +460,11 @@ function parseCharacterIds(jsonStr: string | undefined): number[] {
   overflow: hidden;
   border: 1px solid #ebeef5;
   flex-shrink: 0;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.shot-image:hover {
+  opacity: 0.85;
 }
 .shot-image img {
   width: 100%;
@@ -544,17 +523,6 @@ function parseCharacterIds(jsonStr: string | undefined): number[] {
   justify-content: flex-end;
   align-items: center;
 }
-.video-link {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  color: #67c23a;
-  max-width: 200px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 .loading-center {
   text-align: center;
   padding: 40px;
@@ -562,5 +530,20 @@ function parseCharacterIds(jsonStr: string | undefined): number[] {
 .empty-hint {
   text-align: center;
   padding: 40px;
+}
+/* 预览对话框 */
+.image-preview-container, .video-preview-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.preview-img {
+  max-width: 100%;
+  max-height: 480px;
+  border-radius: 6px;
+}
+.preview-video {
+  max-width: 100%;
+  max-height: 480px;
 }
 </style>

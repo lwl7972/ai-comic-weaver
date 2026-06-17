@@ -64,6 +64,7 @@ public class PromptTemplate {
         CHARACTER,   // A.3 定妆图提示词
         SCENE,       // A.7 场景四视图
         STORYBOARD,  // A.2 视觉风格提示词, A.6 资产提取
+        DIRECTOR,    // A.9 视频生成提示词
         SYSTEM       // A.8.2 分章摘要, 其他系统级提示词
     }
 }

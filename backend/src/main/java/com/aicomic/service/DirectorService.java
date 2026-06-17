@@ -126,9 +126,12 @@ public class DirectorService {
             log.info("单镜头视频生成完成: storyboardId={}", storyboardId);
 
         } catch (ModelCallException e) {
-            log.error("单镜头视频生成失败: {}", e.getMessage(), e);
-            sb.setStatus(Storyboard.StoryboardStatus.ERROR);
-            storyboardRepository.save(sb);
+            log.error("单镜头视频生成失败: storyboardId={}, error={}", storyboardId, e.getMessage(), e);
+            // 重新加载最新状态再标记错误，避免覆盖并发修改
+            storyboardRepository.findById(storyboardId).ifPresent(s -> {
+                s.setStatus(Storyboard.StoryboardStatus.ERROR);
+                storyboardRepository.save(s);
+            });
             sseService.pushNotification("director-error",
                     String.format("分镜 #%d 视频生成失败: %s", sb.getSequence() + 1, e.getMessage()));
         }
@@ -250,8 +253,8 @@ public class DirectorService {
             }
 
             String fullPrompt = buildFullEpisodePrompt(episode, storyboards);
-            String videoUrl = modelCallService.callVideo(fullPrompt,
-                    refImages.isEmpty() ? null : refImages.get(0), null);
+            // refImages 已确认非空（上方 isEmpty 检查），直接取第一个
+            String videoUrl = modelCallService.callVideo(fullPrompt, refImages.get(0), null);
 
             if (videoUrl != null) {
                 // Mark all storyboards as video done
