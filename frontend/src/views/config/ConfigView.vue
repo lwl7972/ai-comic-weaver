@@ -47,6 +47,15 @@
           </el-select>
           <el-button type="primary" @click="openPromptDialog()">新增模板</el-button>
           <el-button type="warning" plain @click="restoreDefaultTemplates">恢复默认</el-button>
+          <el-button plain @click="exportTemplates">导出</el-button>
+          <el-upload
+            :show-file-list="false"
+            :before-upload="importTemplates"
+            accept=".json"
+            style="display: inline-block; margin-left: 12px;"
+          >
+            <el-button plain>导入</el-button>
+          </el-upload>
         </div>
 
         <div v-if="promptLoading" class="loading-center">
@@ -688,6 +697,35 @@ async function restoreDefaultTemplates() {
     notify.success('恢复成功', `已删除 ${res.data.deleted} 个模板，恢复 ${res.data.restored} 个默认模板`)
     await loadPromptTemplates()
   } catch { /* cancelled */ }
+}
+
+async function exportTemplates() {
+  try {
+    const res = await http.get('/v1/prompt-templates/export', { responseType: 'blob' })
+    const url = URL.createObjectURL(res.data)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'prompt-templates.json'
+    a.click()
+    URL.revokeObjectURL(url)
+    notify.success('导出成功', '提示词模板已导出')
+  } catch (e: any) {
+    notify.error('导出失败', e.message || '导出提示词模板失败')
+  }
+}
+
+function importTemplates(file: File) {
+  const formData = new FormData()
+  formData.append('file', file)
+  http.post('/v1/prompt-templates/import', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }).then((res: any) => {
+    notify.success('导入成功', `已导入 ${res.data.imported} 个模板`)
+    loadPromptTemplates()
+  }).catch((e: any) => {
+    notify.error('导入失败', e.message || '导入提示词模板失败')
+  })
+  return false // 阻止 el-upload 自动上传
 }
 
 // 渲染预览

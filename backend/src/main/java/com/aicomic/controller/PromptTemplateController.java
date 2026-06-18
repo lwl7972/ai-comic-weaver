@@ -4,7 +4,11 @@ import com.aicomic.common.response.ApiResponse;
 import com.aicomic.entity.PromptTemplate;
 import com.aicomic.service.PromptTemplateService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
@@ -122,5 +126,34 @@ public class PromptTemplateController {
     @PostMapping("/restore-defaults")
     public ApiResponse<Map<String, Object>> restoreDefaults() {
         return ApiResponse.success(templateService.restoreDefaults());
+    }
+
+    /**
+     * 导出所有模板为 JSON 文件
+     */
+    @GetMapping("/export")
+    public ResponseEntity<byte[]> exportTemplates() {
+        try {
+            byte[] data = templateService.exportTemplatesToJson();
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=prompt-templates.json")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .contentLength(data.length)
+                    .body(data);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * 从 JSON 文件导入模板
+     */
+    @PostMapping("/import")
+    public ApiResponse<Map<String, Object>> importTemplates(@RequestParam("file") MultipartFile file) {
+        try {
+            return ApiResponse.success(templateService.importTemplatesFromJson(file.getInputStream()));
+        } catch (Exception e) {
+            return ApiResponse.error(ApiResponse.PARAM_ERROR, "导入失败: " + e.getMessage());
+        }
     }
 }

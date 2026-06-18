@@ -145,6 +145,41 @@ public class PromptTemplateService {
     }
 
     /**
+     * 导出所有模板为 JSON 字节数组
+     */
+    public byte[] exportTemplatesToJson() {
+        List<PromptTemplate> templates = promptTemplateRepository.findAll();
+        try {
+            return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(templates);
+        } catch (Exception e) {
+            log.error("导出模板失败", e);
+            return new byte[0];
+        }
+    }
+
+    /**
+     * 从 JSON 输入流导入模板（追加模式，不删除已有模板）
+     */
+    @CacheEvict(value = "templates", allEntries = true)
+    @Transactional
+    public Map<String, Object> importTemplatesFromJson(java.io.InputStream inputStream) {
+        try {
+            List<PromptTemplate> imported = objectMapper.readValue(
+                    inputStream, new TypeReference<List<PromptTemplate>>() {});
+            // 清除 ID，作为新模板插入
+            imported.forEach(t -> t.setId(null));
+            List<PromptTemplate> saved = promptTemplateRepository.saveAll(imported);
+            log.info("成功导入 {} 个提示词模板", saved.size());
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("imported", saved.size());
+            return result;
+        } catch (Exception e) {
+            log.error("导入模板失败", e);
+            throw new RuntimeException("导入失败: " + e.getMessage());
+        }
+    }
+
+    /**
      * 渲染提示词：替换模板中的变量占位符
      *
      * @param templateId 模板 ID
