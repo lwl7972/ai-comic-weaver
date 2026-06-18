@@ -11,7 +11,10 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
 import javax.sql.DataSource;
+import java.io.File;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
@@ -19,7 +22,8 @@ import java.util.List;
 
 /**
  * 提示词模板初始化器
- * 应用启动时自动从 JSON 文件加载默认模板到数据库
+ * 首次运行：从 classpath JSON 初始化 → 保存到本地文件
+ * 后续运行：从本地文件加载（如存在），否则从数据库读取
  */
 @Slf4j
 @Component
@@ -30,20 +34,38 @@ public class PromptTemplateInitializer implements CommandLineRunner {
     private final ObjectMapper objectMapper;
     private final DataSource dataSource;
 
+    /** 本地模板文件路径：data/prompt-templates.json */
+    public static final String LOCAL_TEMPLATES_FILE = "prompt-templates.json";
+
     @Override
     public void run(String... args) throws Exception {
         log.info("开始初始化提示词模板...");
 
-        // 检查是否已有模板（本地已有则跳过，不再每次启动都检查迁移）
+        // 检查数据库是否已有模板
         long existingCount = promptTemplateRepository.count();
         if (existingCount > 0) {
             log.info("已存在 {} 个提示词模板，跳过初始化", existingCount);
-            // 仅在首次且需要时执行迁移（通过检查时间戳格式判断是否需要修复）
             migrateIfNeeded();
+            // 确保本地文件存在（从数据库导出）
+            ensureLocalFile();
             return;
         }
 
-        // 首次运行：加载 JSON 文件
+        // 数据库为空：尝试从本地文件加载
+        File localFile = getLocalFile();
+        if (localFile.exists() && localFile.length() > 0) {
+            loadFromLocalFile(localFile);
+            return;
+        }
+
+        // 本地文件不存在：从 classpath 初始化
+        loadFromClasspath();
+    }
+
+    /**
+     * 从 classpath JSON 文件加载默认模板，同时保存到本地文件
+     */
+    private void loadFromClasspath() {
         ClassPathResource resource = new ClassPathResource("data/prompt-templates.json");
         if (!resource.exists()) {
             log.error("提示词模板文件不存在：data/prompt-templates.json");
@@ -52,45 +74,80 @@ public class PromptTemplateInitializer implements CommandLineRunner {
 
         try (InputStream inputStream = resource.getInputStream()) {
             List<PromptTemplate> templates = objectMapper.readValue(
-                inputStream,
-                new TypeReference<List<PromptTemplate>>() {}
-            );
-
-            // 批量保存
+                inputStream, new TypeReference<List<PromptTemplate>>() {});
             List<PromptTemplate> saved = promptTemplateRepository.saveAll(templates);
-            log.info("成功初始化 {} 个提示词模板", saved.size());
+            log.info("从 classpath 初始化 {} 个提示词模板", saved.size());
 
-            // 打印模板分类统计
-            templates.stream()
-                .collect(java.util.stream.Collectors.groupingBy(
-                    PromptTemplate::getCategory,
-                    java.util.stream.Collectors.counting()))
-                .forEach((category, count) ->
-                    log.info("  - {}: {} 个模板", category, count)
-                );
-
+            // 保存到本地文件
+            saveToLocalFile(saved);
         } catch (Exception e) {
             log.error("加载提示词模板失败", e);
         }
     }
 
     /**
-     * 按需迁移：仅在检测到旧格式时执行，避免每次启动都检查
+     * 从本地 JSON 文件加载模板
+     */
+    private void loadFromLocalFile(File localFile) {
+        try {
+            List<PromptTemplate> templates = objectMapper.readValue(
+                localFile, new TypeReference<List<PromptTemplate>>() {});
+            List<PromptTemplate> saved = promptTemplateRepository.saveAll(templates);
+            log.info("从本地文件加载 {} 个提示词模板: {}", saved.size(), localFile.getAbsolutePath());
+        } catch (Exception e) {
+            log.error("从本地文件加载模板失败: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * 确保本地文件存在（数据库有但本地文件丢失时重建）
+     */
+    private void ensureLocalFile() {
+        File localFile = getLocalFile();
+        if (!localFile.exists() || localFile.length() == 0) {
+            List<PromptTemplate> all = promptTemplateRepository.findAll();
+            if (!all.isEmpty()) {
+                saveToLocalFile(all);
+                log.info("重建本地模板文件: {}", localFile.getAbsolutePath());
+            }
+        }
+    }
+
+    /**
+     * 保存模板到本地 JSON 文件
+     */
+    public void saveToLocalFile(List<PromptTemplate> templates) {
+        try {
+            File localFile = getLocalFile();
+            localFile.getParentFile().mkdirs();
+            objectMapper.writerWithDefaultPrettyPrinter().writeValue(localFile, templates);
+            log.info("模板已保存到本地文件: {}", localFile.getAbsolutePath());
+        } catch (Exception e) {
+            log.error("保存模板到本地文件失败: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * 获取本地模板文件路径
+     */
+    private File getLocalFile() {
+        String dataDir = System.getProperty("app.data.dir", "./data");
+        return new File(dataDir, LOCAL_TEMPLATES_FILE);
+    }
+
+    /**
+     * 按需迁移：仅在检测到旧格式时执行
      */
     private void migrateIfNeeded() {
         try (Connection conn = dataSource.getConnection();
              Statement stmt = conn.createStatement()) {
-
-            // 快速检查：时间戳是否已经是正确格式
             ResultSet rs = stmt.executeQuery("SELECT created_at FROM prompt_template WHERE created_at IS NOT NULL LIMIT 1");
             if (rs.next()) {
                 String createdAt = rs.getString("created_at");
                 rs.close();
-                // 已经是正确格式，无需迁移
                 if (createdAt != null && !createdAt.matches("\\d{13}")) {
                     return;
                 }
-                // 需要修复时间戳
                 log.info("检测到旧格式时间戳，正在修复...");
                 stmt.execute("UPDATE prompt_template SET " +
                         "created_at = datetime(CAST(created_at AS INTEGER) / 1000, 'unixepoch', 'localtime'), " +

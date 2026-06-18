@@ -1,6 +1,7 @@
 package com.aicomic.service;
 
 import com.aicomic.common.exception.ResourceNotFoundException;
+import com.aicomic.config.PromptTemplateInitializer;
 import com.aicomic.entity.PromptTemplate;
 import com.aicomic.repository.PromptTemplateRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -28,6 +29,7 @@ public class PromptTemplateService {
 
     private final PromptTemplateRepository promptTemplateRepository;
     private final ObjectMapper objectMapper;
+    private final PromptTemplateInitializer templateInitializer;
 
     /** 占位符正则: {variableName} */
     private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\{(\\w+)}");
@@ -70,7 +72,9 @@ public class PromptTemplateService {
     @CacheEvict(value = "templates", allEntries = true)
     @Transactional
     public PromptTemplate createTemplate(PromptTemplate template) {
-        return promptTemplateRepository.save(template);
+        PromptTemplate saved = promptTemplateRepository.save(template);
+        syncToLocalFile();
+        return saved;
     }
 
     /**
@@ -79,16 +83,17 @@ public class PromptTemplateService {
     @CacheEvict(value = "templates", allEntries = true)
     @Transactional
     public PromptTemplate updateTemplate(Long id, PromptTemplate updated) {
-        return promptTemplateRepository.findById(id).map(template -> {
+        PromptTemplate result = promptTemplateRepository.findById(id).map(template -> {
             if (updated.getName() != null) template.setName(updated.getName());
             if (updated.getCategory() != null) template.setCategory(updated.getCategory());
             if (updated.getContent() != null) template.setContent(updated.getContent());
             if (updated.getVariables() != null) template.setVariables(updated.getVariables());
             if (updated.getIsDefault() != null) template.setIsDefault(updated.getIsDefault());
-            // 版本号递增
             template.setVersion(template.getVersion() + 1);
             return promptTemplateRepository.save(template);
         }).orElseThrow(() -> new ResourceNotFoundException("提示词模板", id));
+        syncToLocalFile();
+        return result;
     }
 
     /**
@@ -100,6 +105,7 @@ public class PromptTemplateService {
             throw new ResourceNotFoundException("提示词模板", id);
         }
         promptTemplateRepository.deleteById(id);
+        syncToLocalFile();
     }
 
     /**
@@ -108,20 +114,32 @@ public class PromptTemplateService {
     @CacheEvict(value = "templates", allEntries = true)
     @Transactional
     public Map<String, Object> restoreDefaults() {
-        // 删除所有现有模板
         long deletedCount = promptTemplateRepository.count();
         promptTemplateRepository.deleteAll();
         log.info("已删除 {} 个提示词模板", deletedCount);
 
-        // 从 JSON 文件重新加载默认模板
         List<PromptTemplate> loaded = loadDefaultTemplates();
         List<PromptTemplate> saved = promptTemplateRepository.saveAll(loaded);
         log.info("已恢复 {} 个默认提示词模板", saved.size());
+
+        syncToLocalFile();
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("deleted", deletedCount);
         result.put("restored", saved.size());
         return result;
+    }
+
+    /**
+     * 同步当前模板到本地文件
+     */
+    private void syncToLocalFile() {
+        try {
+            List<PromptTemplate> all = promptTemplateRepository.findAll();
+            templateInitializer.saveToLocalFile(all);
+        } catch (Exception e) {
+            log.warn("同步模板到本地文件失败: {}", e.getMessage());
+        }
     }
 
     /**
