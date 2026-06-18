@@ -6,11 +6,14 @@ server:
   tomcat:
     accept-count: 10
     threads:
-      min-spare: 4
-      max: 20
+      min-spare: 2
+      max: 10
     connection-timeout: 5000
     # 禁用 Tomcat 的 MBean 注册（减少类加载）
     mbeanregistry:
+      enabled: false
+    # 禁用 Tomcat 的访问日志
+    accesslog:
       enabled: false
 
 spring:
@@ -22,7 +25,13 @@ spring:
     allow-circular-references: false
 
   # === 排除不必要的自动配置以加速启动 ===
-  # 注：不需要的自动配置请在主类 @SpringBootApplication(exclude={...}) 中排除
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
+      - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+      - org.springframework.boot.autoconfigure.security.servlet.SecurityFilterAutoConfiguration
+      - org.springframework.boot.autoconfigure.security.oauth2.client.servlet.OAuth2ClientAutoConfiguration
+      - org.springframework.boot.autoconfigure.security.oauth2.resource.servlet.OAuth2ResourceServerAutoConfiguration
 
   # === SQLite 数据源（连接池由 SQLiteConfig.java 管理） ===
   datasource:
@@ -52,11 +61,17 @@ spring:
         jdbc:
           batch_size: 20
           fetch_size: 50
+          lob:
+            non_contextual_creation: true
         # 禁用统计信息收集（减少内存开销）
         generate_statistics: false
         # 使用 Hibernate 6 的字节码增强延迟加载
         bytecode:
           use_reflection_optimizer: true
+        # 禁用二级缓存
+        cache:
+          use_second_level_cache: false
+          use_query_cache: false
 
   # === 文件上传 ===
   servlet:

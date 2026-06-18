@@ -38,12 +38,10 @@ public class DiagnosticInfo {
     private ResultStatus resultStatus;
 
     /** 结果详情 */
-    @Lob
     @Column(name = "detail_message", columnDefinition = "TEXT")
     private String detailMessage;
 
     /** 建议修复方案 */
-    @Lob
     @Column(name = "suggestion", columnDefinition = "TEXT")
     private String suggestion;
 

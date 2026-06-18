@@ -49,7 +49,7 @@ public class AssetItem {
     private String mimeType;
 
     /** 标签列表 (JSON数组) */
-    @Lob
+    @Column(columnDefinition = "TEXT")
     private String tags;
 
     /** 来源 */

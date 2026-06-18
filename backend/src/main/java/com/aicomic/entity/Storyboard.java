@@ -37,17 +37,14 @@ public class Storyboard {
     private String timeRange;
 
     /** 承接上镜描述 */
-    @Lob
     @Column(columnDefinition = "TEXT")
     private String continuity;
 
     /** 角色对话，格式: [角色名, 情绪]:"台词" */
-    @Lob
     @Column(columnDefinition = "TEXT")
     private String dialogue;
 
     /** 动作描述 */
-    @Lob
     @Column(columnDefinition = "TEXT")
     private String action;
 

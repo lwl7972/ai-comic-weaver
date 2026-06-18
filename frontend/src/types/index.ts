@@ -322,7 +322,7 @@ export interface PromptTemplate {
   updatedAt?: string
 }
 
-export type TemplateCategory = 'SCRIPT' | 'CHARACTER' | 'SCENE' | 'STORYBOARD' | 'SYSTEM'
+export type TemplateCategory = 'SCRIPT' | 'CHARACTER' | 'SCENE' | 'STORYBOARD' | 'DIRECTOR' | 'SYSTEM'
 
 /** 应用全局配置表 app_config */
 export interface AppConfig {

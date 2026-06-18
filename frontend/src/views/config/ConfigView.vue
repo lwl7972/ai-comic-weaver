@@ -46,6 +46,7 @@
             <el-option v-for="cat in templateCategories" :key="cat" :label="getCategoryLabel(cat)" :value="cat" />
           </el-select>
           <el-button type="primary" @click="openPromptDialog()">新增模板</el-button>
+          <el-button type="warning" plain @click="restoreDefaultTemplates">恢复默认</el-button>
         </div>
 
         <div v-if="promptLoading" class="loading-center">
@@ -576,7 +577,7 @@ watch(activeTab, (tab) => {
 const promptTemplates = ref<PromptTemplate[]>([])
 const promptLoading = ref(false)
 const promptCategoryFilter = ref<TemplateCategory | ''>('')
-const templateCategories: TemplateCategory[] = ['SCRIPT', 'CHARACTER', 'SCENE', 'STORYBOARD', 'SYSTEM']
+const templateCategories: TemplateCategory[] = ['SCRIPT', 'CHARACTER', 'SCENE', 'STORYBOARD', 'DIRECTOR', 'SYSTEM']
 
 function getCategoryLabel(cat: TemplateCategory): string {
   const map: Record<TemplateCategory, string> = {
@@ -584,6 +585,7 @@ function getCategoryLabel(cat: TemplateCategory): string {
     CHARACTER: '角色',
     SCENE: '场景',
     STORYBOARD: '分镜',
+    DIRECTOR: '导演',
     SYSTEM: '系统',
   }
   return map[cat] || cat
@@ -675,6 +677,15 @@ async function deletePromptTemplate(tpl: PromptTemplate) {
     await ElMessageBox.confirm(`确定要删除模板「${tpl.name}」吗？`, '确认删除', { type: 'warning' })
     await http.delete(`/v1/prompt-templates/${tpl.id}`)
     notify.success('已删除', '提示词模板已删除')
+    await loadPromptTemplates()
+  } catch { /* cancelled */ }
+}
+
+async function restoreDefaultTemplates() {
+  try {
+    await ElMessageBox.confirm('恢复默认将删除所有自定义模板并重置为内置模板，确定继续？', '恢复默认设置', { type: 'warning' })
+    const res = await http.post('/v1/prompt-templates/restore-defaults')
+    notify.success('恢复成功', `已删除 ${res.data.deleted} 个模板，恢复 ${res.data.restored} 个默认模板`)
     await loadPromptTemplates()
   } catch { /* cancelled */ }
 }

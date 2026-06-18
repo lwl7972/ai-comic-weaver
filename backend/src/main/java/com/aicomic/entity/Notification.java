@@ -33,7 +33,6 @@ public class Notification {
     private String title;
 
     /** 内容 */
-    @Lob
     @Column(columnDefinition = "TEXT")
     private String content;
 

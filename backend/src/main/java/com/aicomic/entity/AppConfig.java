@@ -33,7 +33,6 @@ public class AppConfig {
     @Column(name = "config_key", nullable = false, unique = true, length = 128)
     private String key;
 
-    @Lob
     @Column(name = "config_value", columnDefinition = "TEXT")
     private String value;
 

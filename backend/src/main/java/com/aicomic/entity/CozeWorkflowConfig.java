@@ -35,7 +35,6 @@ public class CozeWorkflowConfig {
     private String workflowId;
 
     /** 输入字段映射 (JSON) */
-    @Lob
     @Column(name = "input_mapping", columnDefinition = "TEXT")
     private String inputMapping;
 

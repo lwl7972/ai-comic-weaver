@@ -33,12 +33,10 @@ public class LogEntry {
     private String sourceModule;      // SCRIPT / CHARACTER / SCENE / ...
 
     /** 日志消息 */
-    @Lob
     @Column(columnDefinition = "TEXT", nullable = false)
     private String message;
 
     /** 异常堆栈 (如有) */
-    @Lob
     @Column(columnDefinition = "TEXT")
     private String stackTrace;
 

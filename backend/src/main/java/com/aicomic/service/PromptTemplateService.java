@@ -103,6 +103,48 @@ public class PromptTemplateService {
     }
 
     /**
+     * 恢复默认模板（删除所有模板，重新从 JSON 加载内置模板）
+     */
+    @CacheEvict(value = "templates", allEntries = true)
+    @Transactional
+    public Map<String, Object> restoreDefaults() {
+        // 删除所有现有模板
+        long deletedCount = promptTemplateRepository.count();
+        promptTemplateRepository.deleteAll();
+        log.info("已删除 {} 个提示词模板", deletedCount);
+
+        // 从 JSON 文件重新加载默认模板
+        List<PromptTemplate> loaded = loadDefaultTemplates();
+        List<PromptTemplate> saved = promptTemplateRepository.saveAll(loaded);
+        log.info("已恢复 {} 个默认提示词模板", saved.size());
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("deleted", deletedCount);
+        result.put("restored", saved.size());
+        return result;
+    }
+
+    /**
+     * 从 classpath JSON 文件加载默认模板
+     */
+    private List<PromptTemplate> loadDefaultTemplates() {
+        try {
+            org.springframework.core.io.ClassPathResource resource =
+                    new org.springframework.core.io.ClassPathResource("data/prompt-templates.json");
+            if (!resource.exists()) {
+                log.warn("默认模板文件不存在：data/prompt-templates.json");
+                return List.of();
+            }
+            try (var is = resource.getInputStream()) {
+                return objectMapper.readValue(is, new TypeReference<List<PromptTemplate>>() {});
+            }
+        } catch (Exception e) {
+            log.error("加载默认模板失败", e);
+            return List.of();
+        }
+    }
+
+    /**
      * 渲染提示词：替换模板中的变量占位符
      *
      * @param templateId 模板 ID

@@ -252,6 +252,14 @@ function startBackend() {
 
     // 快速退出（不等待后台线程）
     '-Dspring.lifecycle.timeout-per-shutdown-phase=5s',
+
+    // 额外的启动优化
+    '-XX:+UseCompressedOops',           // 压缩指针（64位 JVM 默认启用）
+    '-XX:+TieredCompilation',           // 分层编译（与 TieredStopAtLevel=1 配合）
+    '-XX:ReservedCodeCacheSize=64m',    // 代码缓存大小
+    '-XX:+UseFastAccessorMethods',      // 快速访问器方法
+    '-XX:+OptimizeStringConcat',        // 字符串拼接优化
+    '-Dsun.misc.unsafe.allow-opens=true', // 允许内部 API 访问
   ]
 
   const appArgs = [

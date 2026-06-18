@@ -41,17 +41,14 @@ public class Character {
     private String ageRange;          // e.g., "20-30岁"
 
     /** 外貌描述（6层锚点中的外观层） */
-    @Lob
     @Column(columnDefinition = "TEXT")
     private String appearance;
 
     /** 性格描述 */
-    @Lob
     @Column(columnDefinition = "TEXT")
     private String personality;
 
     /** 完整6层身份锚点拼装后的提示词 */
-    @Lob
     @Column(name = "anchor_prompt", columnDefinition = "TEXT")
     private String anchorPrompt;
 

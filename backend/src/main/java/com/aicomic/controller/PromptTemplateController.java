@@ -115,4 +115,12 @@ public class PromptTemplateController {
         Boolean isValid = (Boolean) result.get("valid");
         return Boolean.TRUE.equals(isValid) ? ApiResponse.success(result) : ApiResponse.error(ApiResponse.PARAM_ERROR, "模板变量校验失败");
     }
+
+    /**
+     * 恢复默认模板（删除所有自定义模板，重新加载内置模板）
+     */
+    @PostMapping("/restore-defaults")
+    public ApiResponse<Map<String, Object>> restoreDefaults() {
+        return ApiResponse.success(templateService.restoreDefaults());
+    }
 }

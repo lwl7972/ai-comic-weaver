@@ -16,6 +16,8 @@ import java.io.File;
  * <ul>
  *   <li>排除 JMX 自动配置（桌面应用不需要 JMX 监控）</li>
  *   <li>排除 WebSocket 自动配置（当前未使用 WebSocket）</li>
+ *   <li>排除 SpringDoc/OpenAPI 自动配置（已禁用但仍会加载）</li>
+ *   <li>排除 AOP 自动配置（当前未使用切面）</li>
  *   <li>启用懒加载 + 异步支持</li>
  *   <li>数据目录在 Spring 启动前解析完毕</li>
  * </ul>
@@ -23,6 +25,8 @@ import java.io.File;
 @SpringBootApplication(exclude = {
         JmxAutoConfiguration.class,
         WebSocketServletAutoConfiguration.class,
+        org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration.class,
+        org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration.class,
 })
 @EnableConfigurationProperties
 @EnableAsync

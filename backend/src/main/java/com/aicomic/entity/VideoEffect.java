@@ -34,7 +34,6 @@ public class VideoEffect {
     private VideoEffectType effectType;
 
     /** 效果参数 (JSON) */
-    @Lob
     @Column(name = "effect_params", columnDefinition = "TEXT")
     private String effectParams;
 

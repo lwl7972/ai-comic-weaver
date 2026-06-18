@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 /**
  * 5.13 提示词模板表 - 管理 A.1~A.8 所有提示词模板版本
  *
- * 分类: SCRIPT / CHARACTER / SCENE / STORYBOARD / SYSTEM
+ * 分类: SCRIPT / CHARACTER / SCENE / STORYBOARD / DIRECTOR / SYSTEM
  */
 @Entity
 @Table(name = "prompt_template")
@@ -37,7 +37,6 @@ public class PromptTemplate {
      * 提示词模板内容，支持占位符变量
      * 如: {scriptContent}, {characterList}, {sceneList} 等
      */
-    @Lob
     @Column(columnDefinition = "TEXT", nullable = false)
     private String content;
 

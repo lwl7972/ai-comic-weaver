@@ -27,7 +27,6 @@ public class UserPreference {
     @Column(nullable = false, unique = true)
     private String key;
 
-    @Lob
     @Column(columnDefinition = "TEXT")
     private String value;
 

@@ -40,7 +40,6 @@ public class Episode {
     private String title;
 
     /** 剧本正文内容 */
-    @Lob
     @Column(columnDefinition = "TEXT")
     private String scriptContent;
 

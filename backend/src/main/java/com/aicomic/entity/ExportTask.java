@@ -54,7 +54,6 @@ public class ExportTask {
     private Integer progress = 0;
 
     /** 错误信息 */
-    @Lob
     @Column(columnDefinition = "TEXT")
     private String errorMessage;
 

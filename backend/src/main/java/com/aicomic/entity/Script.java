@@ -31,7 +31,6 @@ public class Script {
     private String title;
 
     /** 大纲内容 (A.5 提示词输出) */
-    @Lob
     @Column(columnDefinition = "TEXT")
     private String outline;
 

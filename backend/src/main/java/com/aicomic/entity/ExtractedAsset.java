@@ -37,17 +37,14 @@ public class ExtractedAsset {
     private String name;
 
     /** 描述 */
-    @Lob
     @Column(columnDefinition = "TEXT")
     private String description;
 
     /** 原文引用（从剧本中提取的原文片段） */
-    @Lob
     @Column(name = "source_text", columnDefinition = "TEXT")
     private String sourceText;
 
     /** 建议的图片生成提示词 */
-    @Lob
     @Column(name = "suggested_image_prompt", columnDefinition = "TEXT")
     private String suggestedImagePrompt;
 

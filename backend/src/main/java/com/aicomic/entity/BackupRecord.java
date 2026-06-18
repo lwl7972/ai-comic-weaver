@@ -38,7 +38,7 @@ public class BackupRecord {
     private Long fileSize;
 
     /** 备份说明 */
-    @Lob
+    @Column(columnDefinition = "TEXT")
     private String description;
 
     @CreationTimestamp

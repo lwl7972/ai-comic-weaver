@@ -39,7 +39,6 @@ public class VersionHistory {
     private Integer versionNumber;
 
     /** 快照数据 (JSON) */
-    @Lob
     @Column(name = "snapshot_data", columnDefinition = "TEXT", nullable = false)
     private String snapshotData;
 
